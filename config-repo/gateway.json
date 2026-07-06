@@ -1,0 +1,70 @@
+{
+  "serviceName": "api-gateway",
+  "port": 8080,
+  "routes": [
+    {
+      "path": "/api/auth",
+      "service": "auth-service"
+    },
+    {
+      "path": "/api/perfil",
+      "service": "auth-service"
+    },
+    {
+      "path": "/api/admin",
+      "service": "auth-service"
+    },
+    {
+      "path": "/api/secretarios",
+      "service": "auth-service"
+    },
+    {
+      "path": "/api/notificaciones",
+      "service": "auth-service"
+    },
+    {
+      "path": "/api/edificios",
+      "service": "catalog-service"
+    },
+    {
+      "path": "/api/disponibilidad",
+      "service": "catalog-service"
+    },
+    {
+      "path": "/api/publicaciones",
+      "service": "catalog-service"
+    },
+    {
+      "path": "/api/reservas",
+      "service": "booking-service"
+    },
+    {
+      "path": "/api/conceptos-cobro",
+      "service": "finance-service"
+    },
+    {
+      "path": "/api/recibos",
+      "service": "finance-service"
+    },
+    {
+      "path": "/api/pagos",
+      "service": "finance-service"
+    },
+    {
+      "path": "/api/mantenimiento",
+      "service": "finance-service"
+    },
+    {
+      "path": "/api/ingresos-alquiler",
+      "service": "finance-service"
+    },
+    {
+      "path": "/api/tarifas",
+      "service": "finance-service"
+    },
+    {
+      "path": "/api/reportes",
+      "service": "finance-service"
+    }
+  ]
+}

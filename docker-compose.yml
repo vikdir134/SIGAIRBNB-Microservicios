@@ -1,0 +1,70 @@
+services:
+  # Config Service
+  # Equivalente al Config Server de Spring Cloud.
+  config-service:
+    build: ./config-service
+    container_name: staype-config-service
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config-repo:/config-repo
+    environment:
+      - PORT=8888
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Registry Service
+  # Equivalente conceptual a Eureka Server.
+  registry-service:
+    build: ./registry-service
+    container_name: staype-registry-service
+    ports:
+      - "8761:8761"
+    environment:
+      - PORT=8761
+    depends_on:
+      config-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  # Unica entrada publica hacia los microservicios.
+  api-gateway:
+    build: ./api-gateway
+    container_name: staype-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - CONFIG_SERVER_URL=http://config-service:8888
+      - REGISTRY_SERVER_URL=http://registry-service:8761
+      - GATEWAY_SECRET=staype-secret
+    depends_on:
+      config-service:
+        condition: service_healthy
+      registry-service:
+        condition: service_healthy
+
+  # Catalog Service
+  # Primer microservicio de negocio.
+  # Maneja edificios, inmuebles, publicaciones y disponibilidad.
+  catalog-service:
+    build: ./catalog-service
+    container_name: staype-catalog-service
+    expose:
+      - "8082"
+    environment:
+      - PORT=8082
+      - SERVICE_NAME=catalog-service
+      - REGISTRY_SERVER_URL=http://registry-service:8761
+      - GATEWAY_SECRET=staype-secret
+    depends_on:
+      registry-service:
+        condition: service_healthy

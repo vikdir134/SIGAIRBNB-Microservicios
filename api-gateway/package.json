@@ -1,0 +1,18 @@
+{
+  "name": "staype-api-gateway",
+  "version": "1.0.0",
+  "description": "API Gateway para Stay.pe Microservices",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^3.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
