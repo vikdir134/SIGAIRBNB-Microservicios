@@ -1,9 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+require('dotenv').config();
 
 const validateGatewayRequest = require('./middlewares/validateGatewayRequest');
-const catalogRoutes = require('./routes/catalog.routes');
+
+const edificioRoutes = require('./routes/edificio.routes');
+const publicacionRoutes = require('./routes/publicacion.routes');
+const disponibilidadRoutes = require('./routes/disponibilidad.routes');
 
 const app = express();
 
@@ -20,8 +24,8 @@ function printBanner() {
   console.log('        STAY.PE CATALOG SERVICE');
   console.log('========================================');
   console.log(`Puerto: ${PORT}`);
-  console.log('Rol: Microservicio de negocio - Catalogo');
-  console.log('Modulos: Edificios, Publicaciones, Disponibilidad');
+  console.log('Rol: Microservicio de negocio - Catálogo');
+  console.log('Módulos: Edificios, Publicaciones, Disponibilidad');
   console.log('========================================');
   console.log('');
 }
@@ -35,16 +39,12 @@ async function registerService() {
       healthUrl: `http://${SERVICE_NAME}:${PORT}/health`
     });
 
-    console.log(`[CATALOG-SERVICE] Registrado correctamente en registry-service`);
+    console.log('[CATALOG-SERVICE] Registrado correctamente en registry-service');
   } catch (error) {
     console.error('[CATALOG-SERVICE] Error al registrarse:', error.message);
   }
 }
 
-/*
-  Esta ruta queda libre para Docker, Registry y pruebas internas.
-  No exige pasar por Gateway.
-*/
 app.get('/health', (req, res) => {
   res.json({
     status: 'UP',
@@ -53,17 +53,26 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/api/catalog/test', (req, res) => {
+  res.json({
+    message: 'Catalog Service funcionando correctamente',
+    service: SERVICE_NAME
+  });
+});
+
 /*
-  Desde aqui aplicamos el filtro.
-  Cualquier ruta de negocio debe venir desde el API Gateway.
+  Desde aquí se bloquea el acceso directo.
+  Toda ruta real de negocio debe venir desde el API Gateway.
 */
 app.use(validateGatewayRequest);
 
-app.use('/api', catalogRoutes);
+app.use('/api/edificios', edificioRoutes);
+app.use('/api/publicaciones', publicacionRoutes);
+app.use('/api/disponibilidad', disponibilidadRoutes);
 
 app.listen(PORT, async () => {
   printBanner();
-  console.log(`[CATALOG-SERVICE] Ejecutandose en http://localhost:${PORT}`);
+  console.log(`[CATALOG-SERVICE] Ejecutándose en http://localhost:${PORT}`);
 
   await registerService();
 });

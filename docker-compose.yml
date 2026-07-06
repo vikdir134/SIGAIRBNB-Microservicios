@@ -60,11 +60,8 @@ services:
     container_name: staype-catalog-service
     expose:
       - "8082"
-    environment:
-      - PORT=8082
-      - SERVICE_NAME=catalog-service
-      - REGISTRY_SERVER_URL=http://registry-service:8761
-      - GATEWAY_SECRET=staype-secret
+    env_file:
+      - ./catalog-service/.env
     depends_on:
       registry-service:
         condition: service_healthy
