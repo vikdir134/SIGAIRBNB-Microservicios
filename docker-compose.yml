@@ -51,6 +51,10 @@ services:
         condition: service_healthy
       registry-service:
         condition: service_healthy
+      catalog-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
 
   # Catalog Service
   # Primer microservicio de negocio.
@@ -62,6 +66,17 @@ services:
       - "8082"
     env_file:
       - ./catalog-service/.env
+    depends_on:
+      registry-service:
+        condition: service_healthy
+
+  auth-service:
+    build: ./auth-service
+    container_name: staype-auth-service
+    expose:
+      - "8081"
+    env_file:
+      - ./auth-service/.env
     depends_on:
       registry-service:
         condition: service_healthy
