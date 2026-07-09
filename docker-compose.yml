@@ -55,6 +55,8 @@ services:
         condition: service_started
       auth-service:
         condition: service_started
+      booking-service:
+        condition: service_started
 
   # Catalog Service
   # Primer microservicio de negocio.
@@ -77,6 +79,17 @@ services:
       - "8081"
     env_file:
       - ./auth-service/.env
+    depends_on:
+      registry-service:
+        condition: service_healthy
+
+  booking-service:
+    build: ./booking-service
+    container_name: staype-booking-service
+    expose:
+      - "8083"
+    env_file:
+      - ./booking-service/.env
     depends_on:
       registry-service:
         condition: service_healthy
