@@ -1,6 +1,8 @@
 const sql = require('mssql');
 require('dotenv').config();
 
+const SERVICE_NAME = process.env.SERVICE_NAME || 'auth-service';
+
 const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -21,17 +23,17 @@ const getConnection = async () => {
       return pool;
     }
 
-    console.log('[CATALOG-SERVICE] Intentando conectar a SQL Server...');
-    console.log('[CATALOG-SERVICE] Servidor:', process.env.DB_SERVER);
-    console.log('[CATALOG-SERVICE] Puerto:', process.env.DB_PORT);
-    console.log('[CATALOG-SERVICE] Base de datos:', process.env.DB_DATABASE);
+    console.log(`[${SERVICE_NAME}] Intentando conectar a SQL Server...`);
+    console.log(`[${SERVICE_NAME}] Servidor:`, process.env.DB_SERVER);
+    console.log(`[${SERVICE_NAME}] Puerto:`, process.env.DB_PORT);
+    console.log(`[${SERVICE_NAME}] Base de datos:`, process.env.DB_DATABASE);
 
     pool = await sql.connect(dbConfig);
 
-    console.log('[CATALOG-SERVICE] Conexión exitosa a SQL Server');
+    console.log(`[${SERVICE_NAME}] Conexión exitosa a SQL Server`);
     return pool;
   } catch (error) {
-    console.error('[CATALOG-SERVICE] Error al conectar con SQL Server:', error.message);
+    console.error(`[${SERVICE_NAME}] Error al conectar con SQL Server:`, error.message);
     throw error;
   }
 };
