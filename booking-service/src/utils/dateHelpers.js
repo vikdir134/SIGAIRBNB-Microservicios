@@ -1,4 +1,8 @@
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const BOOKING_MIN_YEAR = new Date().getFullYear();
+const MAX_RESERVA_FUTURE_YEARS = Number(
+  process.env.MAX_RESERVA_FUTURE_YEARS || 1
+);
 
 const pad2 = (value) => String(value).padStart(2, '0');
 
@@ -46,8 +50,13 @@ const diffDays = (startDateOnly, endDateOnly) => {
   return Math.round((end.getTime() - start.getTime()) / 86400000);
 };
 
-const isDateNotAbsurd = (dateOnly, { minYear = 2000, maxFutureYears = 5 } = {}) => {
-  const date = parseDateOnly(dateOnly);
+const isDateNotAbsurd = (
+  dateOnly,
+  {
+    minYear = BOOKING_MIN_YEAR,
+    maxFutureYears = MAX_RESERVA_FUTURE_YEARS
+  } = {}
+) => {  const date = parseDateOnly(dateOnly);
 
   if (!date) return false;
 
@@ -70,8 +79,8 @@ const validateDateRange = ({
   end,
   allowSameDay = false,
   allowPast = false,
-  minYear = 2000,
-  maxFutureYears = 5,
+minYear = BOOKING_MIN_YEAR,
+maxFutureYears = MAX_RESERVA_FUTURE_YEARS,
   maxDays = null,
   fieldStart = 'La fecha de inicio',
   fieldEnd = 'La fecha de fin'
@@ -114,8 +123,10 @@ const validateDateRange = ({
 
 const validateYearAllowed = (
   value,
-  { minYear = 2000, maxFutureYears = 1 } = {}
-) => {
+{
+  minYear = BOOKING_MIN_YEAR,
+  maxFutureYears = MAX_RESERVA_FUTURE_YEARS
+} = {}) => {
   const year = Number(value);
   const maxYear = new Date().getFullYear() + maxFutureYears;
 

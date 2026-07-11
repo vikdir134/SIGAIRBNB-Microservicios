@@ -42,6 +42,13 @@ const {
   validateDateRange
 } = require('../utils/dateHelpers');
 
+const MAX_RESERVA_DAYS = Number(process.env.MAX_RESERVA_DAYS || 365);
+const MAX_RESERVA_FUTURE_YEARS = Number(
+  process.env.MAX_RESERVA_FUTURE_YEARS || 1
+);
+
+
+
 const limpiarTexto = (valor) => {
   if (valor === undefined || valor === null) return '';
   return String(valor).trim();
@@ -365,13 +372,13 @@ const solicitarReserva = async (req, res) => {
       });
     }
 
-    const erroresRangoReserva = validateDateRange({
-      start: fecha_inicio,
-      end: fecha_fin,
-      allowPast: false,
-      maxDays: 730,
-      maxFutureYears: 3
-    });
+   const erroresRangoReserva = validateDateRange({
+  start: fecha_inicio,
+  end: fecha_fin,
+  allowPast: false,
+  maxDays: MAX_RESERVA_DAYS,
+  maxFutureYears: MAX_RESERVA_FUTURE_YEARS
+});
 
     if (erroresRangoReserva.length > 0) {
       return res.status(400).json({
@@ -1483,11 +1490,16 @@ const solicitarExtensionReserva = async (req, res) => {
       });
     }
 
-    if (!isDateNotAbsurd(nueva_fecha_fin, { minYear: 2000, maxFutureYears: 3 })) {
-      return res.status(400).json({
-        mensaje: 'La nueva fecha de finalización está fuera del rango permitido para el sistema'
-      });
-    }
+    if (
+  !isDateNotAbsurd(nueva_fecha_fin, {
+    minYear: new Date().getFullYear(),
+    maxFutureYears: MAX_RESERVA_FUTURE_YEARS
+  })
+) {
+  return res.status(400).json({
+    mensaje: 'La nueva fecha de finalización está fuera del rango permitido para el sistema'
+  });
+}
 
     if (isPastDateOnly(nueva_fecha_fin)) {
       return res.status(400).json({
