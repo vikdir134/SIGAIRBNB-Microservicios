@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry-service
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry-service
+  template:
+    metadata:
+      labels:
+        app: registry-service
+    spec:
+      containers:
+        - name: registry-service
+          image: sigairbnb-microservicios-registry-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8761
+          env:
+            - name: PORT
+              value: "8761"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-service
+  namespace: staype
+spec:
+  type: NodePort
+  selector:
+    app: registry-service
+  ports:
+    - port: 8761
+      targetPort: 8761
+      nodePort: 30761

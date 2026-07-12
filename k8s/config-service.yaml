@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-service
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-service
+  template:
+    metadata:
+      labels:
+        app: config-service
+    spec:
+      containers:
+        - name: config-service
+          image: sigairbnb-microservicios-config-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8888
+          env:
+            - name: PORT
+              value: "8888"
+          volumeMounts:
+            - name: config-repo-volume
+              mountPath: /config-repo
+      volumes:
+        - name: config-repo-volume
+          configMap:
+            name: config-repo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-service
+  namespace: staype
+spec:
+  selector:
+    app: config-service
+  ports:
+    - port: 8888
+      targetPort: 8888

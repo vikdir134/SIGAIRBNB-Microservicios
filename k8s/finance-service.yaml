@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-service
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-service
+  template:
+    metadata:
+      labels:
+        app: finance-service
+    spec:
+      containers:
+        - name: finance-service
+          image: sigairbnb-microservicios-finance-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - secretRef:
+                name: finance-env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-service
+  namespace: staype
+spec:
+  selector:
+    app: finance-service
+  ports:
+    - port: 8084
+      targetPort: 8084

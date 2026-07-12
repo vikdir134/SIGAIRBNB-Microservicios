@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: sigairbnb-microservicios-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: CONFIG_SERVER_URL
+              value: "http://config-service:8888"
+            - name: REGISTRY_SERVER_URL
+              value: "http://registry-service:8761"
+            - name: GATEWAY_SECRET
+              value: "staype-secret"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: staype
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080

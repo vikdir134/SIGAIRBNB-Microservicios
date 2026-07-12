@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: sigairbnb-microservicios-catalog-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - secretRef:
+                name: catalog-env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: staype
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - port: 8082
+      targetPort: 8082
