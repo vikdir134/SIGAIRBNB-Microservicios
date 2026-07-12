@@ -4,6 +4,13 @@ Este repositorio contiene la versión basada en microservicios del sistema **SIG
 
 La arquitectura fue reorganizada para separar responsabilidades por dominio, usando servicios independientes, un API Gateway, un servicio de configuración centralizada y un registro de servicios similar a Eureka.
 
+Además, el sistema puede desplegarse localmente de dos formas:
+
+```txt
+1. Docker Compose
+2. Kubernetes local con Docker Desktop
+```
+
 ---
 
 ## Arquitectura General
@@ -23,6 +30,7 @@ SIGAIRBNB-Microservicios
 ├── finance-service
 │
 ├── config-repo
+├── k8s
 └── docker-compose.yml
 ```
 
@@ -57,7 +65,7 @@ Puerto:
 8888
 ```
 
-Ruta de prueba:
+Ruta de prueba en Docker Compose:
 
 ```txt
 GET http://localhost:8888/config/gateway
@@ -89,7 +97,7 @@ Puerto:
 8761
 ```
 
-Ruta de prueba:
+Ruta de prueba en Docker Compose:
 
 ```txt
 GET http://localhost:8761/services
@@ -101,7 +109,7 @@ GET http://localhost:8761/services
 
 Es la **entrada única** hacia todos los microservicios.
 
-El frontend ya no consume directamente a cada servicio, sino que todas las peticiones entran por:
+El frontend ya no consume directamente a cada servicio, sino que todas las peticiones entran por el API Gateway:
 
 ```txt
 http://localhost:8080/api
@@ -127,6 +135,8 @@ Flujo:
 Frontend
    ↓
 api-gateway
+   ↓
+registry-service
    ↓
 catalog-service
 ```
@@ -300,10 +310,11 @@ Puerto interno:
 Ejemplos:
 
 ```txt
-GET  http://localhost:8080/api/recibos
+GET  http://localhost:8080/api/recibos/test
+GET  http://localhost:8080/api/conceptos-cobro
 GET  http://localhost:8080/api/pagos/mis-pagos
 GET  http://localhost:8080/api/reportes/financiero-mensual
-POST http://localhost:8080/api/pagos/pagar-online
+POST http://localhost:8080/api/pagos/recibos/:recibo_id/pagar-online
 ```
 
 ---
@@ -320,7 +331,13 @@ booking-service    → 8083
 finance-service    → 8084
 ```
 
-Solo el `api-gateway`, el `config-service` y el `registry-service` exponen puertos hacia la máquina local.
+En Docker Compose, solo se exponen hacia la máquina local:
+
+```txt
+config-service
+registry-service
+api-gateway
+```
 
 Los microservicios de negocio usan `expose`, por lo que solo son accesibles dentro de la red interna de Docker.
 
@@ -408,32 +425,82 @@ Es importante que todos los microservicios que validan tokens usen el mismo:
 JWT_SECRET
 ```
 
+Los archivos `.env` no deben subirse al repositorio porque contienen credenciales sensibles.
+
 ---
 
-## Ejecución con Docker Compose
+## Archivos `.env` requeridos
 
-Para construir y levantar todos los servicios:
+Cada integrante debe tener localmente estos archivos:
 
-```bash
-docker compose up --build
+```txt
+auth-service/.env
+catalog-service/.env
+booking-service/.env
+finance-service/.env
 ```
 
-Para detener los servicios:
+Estos archivos son necesarios tanto para Docker Compose como para Kubernetes.
+
+---
+
+# Ejecución con Docker Compose
+
+## Construir y levantar todos los servicios
+
+```bash
+docker compose up -d --build
+```
+
+## Levantar sin reconstruir
+
+```bash
+docker compose up -d
+```
+
+## Detener los servicios
 
 ```bash
 docker compose down
 ```
 
-Para ver los servicios registrados:
+## Ver estado de los contenedores
+
+```bash
+docker compose ps
+```
+
+## Ver logs
+
+```bash
+docker compose logs -f
+```
+
+## Ver servicios registrados
 
 ```txt
 http://localhost:8761/services
 ```
 
-Para probar el Gateway:
+## Probar el Gateway
 
 ```txt
-http://localhost:8080
+http://localhost:8080/health
+```
+
+## Probar finance-service por Gateway
+
+```txt
+http://localhost:8080/api/recibos/test
+```
+
+Respuesta esperada:
+
+```json
+{
+  "message": "Finance Service funcionando correctamente",
+  "service": "finance-service"
+}
 ```
 
 ---
@@ -460,9 +527,420 @@ El `api-gateway` se encarga finalmente de enrutar las peticiones hacia los micro
 
 ---
 
-## Ejemplo de Trazabilidad
+# Despliegue Local con Kubernetes
 
-### Consulta de publicaciones
+Además de Docker Compose, el proyecto incluye una carpeta:
+
+```txt
+k8s/
+```
+
+Esta carpeta contiene los archivos YAML necesarios para desplegar los microservicios en Kubernetes local usando Docker Desktop.
+
+Estructura:
+
+```txt
+k8s
+├── namespace.yaml
+├── config-service.yaml
+├── registry-service.yaml
+├── api-gateway.yaml
+├── auth-service.yaml
+├── catalog-service.yaml
+├── booking-service.yaml
+└── finance-service.yaml
+```
+
+---
+
+## Requisitos para Kubernetes
+
+Cada integrante debe tener:
+
+```txt
+Docker Desktop
+Kubernetes habilitado en Docker Desktop
+kubectl instalado
+Archivos .env locales
+Imágenes Docker construidas localmente
+```
+
+Para verificar Kubernetes:
+
+```bash
+kubectl version --client
+```
+
+```bash
+kubectl get nodes
+```
+
+Debe aparecer un nodo en estado `Ready`.
+
+Ejemplo:
+
+```txt
+desktop-control-plane   Ready
+```
+
+---
+
+## Construcción de Imágenes Docker
+
+Kubernetes utilizará las imágenes locales generadas por Docker.
+
+Antes de aplicar los YAML, construir las imágenes:
+
+```bash
+docker compose build
+```
+
+También se puede usar:
+
+```bash
+docker compose up -d --build
+docker compose down
+```
+
+Las imágenes esperadas son:
+
+```txt
+sigairbnb-microservicios-config-service
+sigairbnb-microservicios-registry-service
+sigairbnb-microservicios-api-gateway
+sigairbnb-microservicios-auth-service
+sigairbnb-microservicios-catalog-service
+sigairbnb-microservicios-booking-service
+sigairbnb-microservicios-finance-service
+```
+
+---
+
+## Crear Namespace
+
+```bash
+kubectl apply -f .\k8s\namespace.yaml
+```
+
+El namespace utilizado es:
+
+```txt
+staype
+```
+
+---
+
+## Crear ConfigMap
+
+El `config-service` necesita leer el archivo:
+
+```txt
+config-repo/gateway.json
+```
+
+Para eso se crea un ConfigMap:
+
+```bash
+kubectl create configmap config-repo `
+  --from-file=gateway.json=.\config-repo\gateway.json `
+  -n staype `
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+---
+
+## Crear Secrets desde los `.env`
+
+Los archivos YAML no contienen credenciales directamente.
+
+Las variables sensibles se cargan mediante Secrets creados desde los archivos `.env`.
+
+```bash
+kubectl create secret generic auth-env `
+  --from-env-file=.\auth-service\.env `
+  -n staype `
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic catalog-env `
+  --from-env-file=.\catalog-service\.env `
+  -n staype `
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic booking-env `
+  --from-env-file=.\booking-service\.env `
+  -n staype `
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic finance-env `
+  --from-env-file=.\finance-service\.env `
+  -n staype `
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+---
+
+## Aplicar los YAML de Kubernetes
+
+```bash
+kubectl apply -f .\k8s\
+```
+
+---
+
+## Verificar Pods
+
+```bash
+kubectl get pods -n staype
+```
+
+Resultado esperado:
+
+```txt
+api-gateway        1/1 Running
+auth-service       1/1 Running
+booking-service    1/1 Running
+catalog-service    1/1 Running
+config-service     1/1 Running
+finance-service    1/1 Running
+registry-service   1/1 Running
+```
+
+---
+
+## Verificar Services
+
+```bash
+kubectl get svc -n staype
+```
+
+Resultado esperado:
+
+```txt
+api-gateway        NodePort    8080:30080/TCP
+registry-service   NodePort    8761:30761/TCP
+auth-service       ClusterIP   8081/TCP
+catalog-service    ClusterIP   8082/TCP
+booking-service    ClusterIP   8083/TCP
+finance-service    ClusterIP   8084/TCP
+config-service     ClusterIP   8888/TCP
+```
+
+---
+
+## Tipos de Service en Kubernetes
+
+En este proyecto se usan principalmente dos tipos:
+
+### ClusterIP
+
+Se usa para microservicios internos:
+
+```txt
+auth-service
+catalog-service
+booking-service
+finance-service
+config-service
+```
+
+Estos servicios solo son accesibles dentro del clúster.
+
+### NodePort
+
+Se usa para servicios que necesitamos probar desde la computadora local:
+
+```txt
+api-gateway
+registry-service
+```
+
+El `api-gateway` es la entrada principal al sistema.
+
+El `registry-service` se expone para poder ver los servicios registrados durante las pruebas.
+
+---
+
+## Pruebas con port-forward
+
+En algunos entornos de Docker Desktop, el acceso directo por NodePort puede no funcionar correctamente desde el navegador. Por eso se recomienda usar `kubectl port-forward`.
+
+### Terminal 1: Registry
+
+```bash
+kubectl port-forward -n staype svc/registry-service 18761:8761
+```
+
+Abrir en navegador:
+
+```txt
+http://localhost:18761/services
+```
+
+Resultado esperado:
+
+```json
+{
+  "message": "Servicios registrados",
+  "total": 4,
+  "data": {
+    "auth-service": {},
+    "catalog-service": {},
+    "booking-service": {},
+    "finance-service": {}
+  }
+}
+```
+
+### Terminal 2: API Gateway
+
+```bash
+kubectl port-forward -n staype svc/api-gateway 18080:8080
+```
+
+Probar en navegador:
+
+```txt
+http://localhost:18080/api/recibos/test
+```
+
+Respuesta esperada:
+
+```json
+{
+  "message": "Finance Service funcionando correctamente",
+  "service": "finance-service"
+}
+```
+
+---
+
+## Problema común: Registry vacío
+
+En Kubernetes puede ocurrir que el registry aparezca así:
+
+```json
+{
+  "message": "Servicios registrados",
+  "total": 0,
+  "data": {}
+}
+```
+
+Esto ocurre porque Kubernetes no tiene `depends_on` como Docker Compose.
+
+Algunos microservicios pueden iniciar antes de que el `registry-service` esté listo, intentan registrarse, fallan y no vuelven a intentarlo automáticamente.
+
+Solución:
+
+```bash
+kubectl rollout restart deployment/auth-service -n staype
+kubectl rollout restart deployment/catalog-service -n staype
+kubectl rollout restart deployment/booking-service -n staype
+kubectl rollout restart deployment/finance-service -n staype
+kubectl rollout restart deployment/api-gateway -n staype
+```
+
+Luego revisar:
+
+```bash
+kubectl get pods -n staype
+```
+
+Y volver a probar:
+
+```txt
+http://localhost:18761/services
+```
+
+---
+
+## Apagar y volver a probar Kubernetes
+
+Cerrar las terminales donde corre `port-forward` no elimina Kubernetes.
+
+Solo se corta el acceso temporal desde la máquina local.
+
+Para volver a probar:
+
+```bash
+kubectl get pods -n staype
+```
+
+Si los pods siguen en `Running`, solo abrir nuevamente los port-forward:
+
+```bash
+kubectl port-forward -n staype svc/registry-service 18761:8761
+```
+
+```bash
+kubectl port-forward -n staype svc/api-gateway 18080:8080
+```
+
+---
+
+## Eliminar el despliegue de Kubernetes
+
+Para eliminar todos los recursos del proyecto en Kubernetes:
+
+```bash
+kubectl delete namespace staype
+```
+
+Esto elimina:
+
+```txt
+Pods
+Deployments
+Services
+ConfigMaps
+Secrets
+```
+
+Para volver a desplegar, repetir:
+
+```txt
+1. Crear namespace
+2. Crear ConfigMap
+3. Crear Secrets
+4. Aplicar los YAML
+5. Verificar pods y services
+6. Abrir port-forward
+```
+
+---
+
+# Integración con Frontend
+
+El frontend debe apuntar al API Gateway.
+
+Para Docker Compose:
+
+```env
+VITE_API_URL=http://localhost:8080/api
+```
+
+Para Kubernetes usando port-forward:
+
+```env
+VITE_API_URL=http://localhost:18080/api
+```
+
+De esta forma, el frontend no necesita saber qué microservicio atiende cada ruta.
+
+Ejemplo:
+
+```txt
+/api/auth/login           → auth-service
+/api/publicaciones        → catalog-service
+/api/reservas             → booking-service
+/api/pagos                → finance-service
+```
+
+---
+
+# Ejemplo de Trazabilidad
+
+## Consulta de publicaciones
 
 ```txt
 GET http://localhost:8080/api/publicaciones
@@ -486,7 +964,7 @@ SQL Server
 
 ---
 
-### Login
+## Login
 
 ```txt
 POST http://localhost:8080/api/auth/login
@@ -508,7 +986,7 @@ JWT
 
 ---
 
-### Reservas
+## Reservas
 
 ```txt
 GET http://localhost:8080/api/reservas/mis-solicitudes
@@ -530,7 +1008,7 @@ SQL Server
 
 ---
 
-### Pagos
+## Pagos
 
 ```txt
 GET http://localhost:8080/api/pagos/mis-pagos
@@ -552,82 +1030,113 @@ SQL Server
 
 ---
 
-## Pruebas Básicas
+# Pruebas Básicas
 
-### Config Service
+## Config Service
 
 ```txt
 GET http://localhost:8888/health
 GET http://localhost:8888/config/gateway
 ```
 
-### Registry Service
+## Registry Service
+
+Docker Compose:
 
 ```txt
 GET http://localhost:8761/health
 GET http://localhost:8761/services
 ```
 
-### API Gateway
+Kubernetes con port-forward:
+
+```txt
+GET http://localhost:18761/services
+```
+
+## API Gateway
+
+Docker Compose:
 
 ```txt
 GET http://localhost:8080/health
 ```
 
-### Auth Service
+Kubernetes con port-forward:
+
+```txt
+GET http://localhost:18080/health
+```
+
+## Auth Service
+
+Docker Compose:
 
 ```txt
 POST http://localhost:8080/api/auth/login
 GET  http://localhost:8080/api/perfil
 ```
 
-### Catalog Service
+Kubernetes con port-forward:
+
+```txt
+POST http://localhost:18080/api/auth/login
+GET  http://localhost:18080/api/perfil
+```
+
+## Catalog Service
+
+Docker Compose:
 
 ```txt
 GET http://localhost:8080/api/publicaciones
 GET http://localhost:8080/api/edificios
 ```
 
-### Booking Service
+Kubernetes con port-forward:
+
+```txt
+GET http://localhost:18080/api/publicaciones
+GET http://localhost:18080/api/edificios
+```
+
+## Booking Service
+
+Docker Compose:
 
 ```txt
 GET http://localhost:8080/api/reservas/mis-solicitudes
 GET http://localhost:8080/api/reservas/gestion/solicitudes
 ```
 
-### Finance Service
+Kubernetes con port-forward:
 
 ```txt
+GET http://localhost:18080/api/reservas/mis-solicitudes
+GET http://localhost:18080/api/reservas/gestion/solicitudes
+```
+
+## Finance Service
+
+Docker Compose:
+
+```txt
+GET http://localhost:8080/api/recibos/test
 GET http://localhost:8080/api/pagos/mis-pagos
 GET http://localhost:8080/api/reportes/financiero-mensual
 ```
 
----
-
-## Integración con Frontend
-
-El frontend debe apuntar al API Gateway:
-
-```ts
-const API_URL = 'http://localhost:8080/api';
-
-export default API_URL;
-```
-
-De esta forma, el frontend no necesita saber qué microservicio atiende cada ruta.
-
-Ejemplo:
+Kubernetes con port-forward:
 
 ```txt
-/api/auth/login           → auth-service
-/api/publicaciones        → catalog-service
-/api/reservas             → booking-service
-/api/pagos                → finance-service
+GET http://localhost:18080/api/recibos/test
+GET http://localhost:18080/api/pagos/mis-pagos
+GET http://localhost:18080/api/reportes/financiero-mensual
 ```
 
 ---
 
-## Resumen de la Arquitectura
+# Resumen de la Arquitectura
 
 ```txt
 Frontend React
@@ -646,17 +1155,24 @@ SQL Server / Azure SQL Database
 
 ---
 
-## Estado Final Esperado
+# Estado Final
 
 Con esta arquitectura, el sistema queda dividido por responsabilidades:
 
 ```txt
-auth-service      → identidad y usuarios
-catalog-service   → catálogo de inmuebles
-booking-service   → reservas
-finance-service   → finanzas
+auth-service      → identidad, usuarios y notificaciones
+catalog-service   → catálogo de inmuebles, publicaciones y disponibilidad
+booking-service   → reservas, vetting, check-in, check-out y extensiones
+finance-service   → conceptos de cobro, recibos, pagos, tarifas y reportes
 ```
 
 El `api-gateway` centraliza el acceso, el `registry-service` mantiene el registro de servicios activos y el `config-service` centraliza la configuración de rutas.
+
+Además, el sistema puede ejecutarse localmente mediante:
+
+```txt
+Docker Compose
+Kubernetes local
+```
 
 Esta estructura permite escalar, mantener y desplegar cada módulo de forma más independiente.
