@@ -34,6 +34,76 @@ services:
       timeout: 5s
       retries: 5
 
+  # MySQL para booking-service
+  booking-mysql:
+    image: mysql:8.0
+    container_name: staype-booking-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: staype_booking_db
+      MYSQL_USER: booking_user
+      MYSQL_PASSWORD: booking_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - booking_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Catalog Service
+  # Maneja edificios, inmuebles, publicaciones y disponibilidad.
+  catalog-service:
+    build: ./catalog-service
+    container_name: staype-catalog-service
+    expose:
+      - "8082"
+    env_file:
+      - ./catalog-service/.env
+    depends_on:
+      registry-service:
+        condition: service_healthy
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    container_name: staype-auth-service
+    expose:
+      - "8081"
+    env_file:
+      - ./auth-service/.env
+    depends_on:
+      registry-service:
+        condition: service_healthy
+
+  # Booking Service
+  booking-service:
+    build: ./booking-service
+    container_name: staype-booking-service
+    expose:
+      - "8083"
+    env_file:
+      - ./booking-service/.env
+    depends_on:
+      registry-service:
+        condition: service_healthy
+      booking-mysql:
+        condition: service_healthy
+
+  # Finance Service
+  finance-service:
+    build: ./finance-service
+    container_name: staype-finance-service
+    expose:
+      - "8084"
+    env_file:
+      - ./finance-service/.env
+    depends_on:
+      registry-service:
+        condition: service_healthy
+
   # API Gateway
   # Unica entrada publica hacia los microservicios.
   api-gateway:
@@ -60,49 +130,5 @@ services:
       finance-service:
         condition: service_started
 
-  # Catalog Service
-  # Primer microservicio de negocio.
-  # Maneja edificios, inmuebles, publicaciones y disponibilidad.
-  catalog-service:
-    build: ./catalog-service
-    container_name: staype-catalog-service
-    expose:
-      - "8082"
-    env_file:
-      - ./catalog-service/.env
-    depends_on:
-      registry-service:
-        condition: service_healthy
-
-  auth-service:
-    build: ./auth-service
-    container_name: staype-auth-service
-    expose:
-      - "8081"
-    env_file:
-      - ./auth-service/.env
-    depends_on:
-      registry-service:
-        condition: service_healthy
-
-  booking-service:
-    build: ./booking-service
-    container_name: staype-booking-service
-    expose:
-      - "8083"
-    env_file:
-      - ./booking-service/.env
-    depends_on:
-      registry-service:
-        condition: service_healthy
-
-  finance-service:
-    build: ./finance-service
-    container_name: staype-finance-service
-    expose:
-      - "8084"
-    env_file:
-      - ./finance-service/.env
-    depends_on:
-      registry-service:
-        condition: service_healthy
+volumes:
+  booking_mysql_data:
