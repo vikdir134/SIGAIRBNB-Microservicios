@@ -1,0 +1,143 @@
+
+booking-service\src\models\notificacion.model.js:25:      INSERT INTO auth.Notificacion (
+booking-service\src\models\notificacion.model.js:85:      FROM auth.Notificacion n
+booking-service\src\models\notificacion.model.js:100:      FROM auth.Notificacion
+booking-service\src\models\notificacion.model.js:116:      UPDATE auth.Notificacion
+booking-service\src\models\notificacion.model.js:147:      UPDATE auth.Notificacion
+booking-service\src\models\reserva.model.js:28:      FROM catalog.Publicacion p
+booking-service\src\models\reserva.model.js:29:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:64:      FROM catalog.BloqueoDisponibilidad b
+booking-service\src\models\reserva.model.js:65:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:92:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:93:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:138:        INSERT INTO booking.Reserva (
+booking-service\src\models\reserva.model.js:182:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:247:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:248:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:250:      LEFT JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:255:        FROM catalog.InmuebleFoto f
+booking-service\src\models\reserva.model.js:282:        FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:358:    FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:359:    INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:361:    INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:363:    INNER JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:365:    LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:370:      FROM catalog.InmuebleFoto f
+booking-service\src\models\reserva.model.js:383:      FROM booking.EvaluacionInquilino ei
+booking-service\src\models\reserva.model.js:439:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:440:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:442:      INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:450:            FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:485:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:486:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:524:        UPDATE r
+booking-service\src\models\reserva.model.js:546:        FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:547:        INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:549:        INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:557:              FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:583:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:629:        UPDATE r
+booking-service\src\models\reserva.model.js:653:        FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:654:        INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:656:        INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:664:              FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:690:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:732:      FROM booking.ReservaEvento e
+booking-service\src\models\reserva.model.js:733:      INNER JOIN booking.Reserva r
+booking-service\src\models\reserva.model.js:735:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:737:      INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:739:      LEFT JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:741:      LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:749:            FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:806:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:807:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:809:      LEFT JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:814:        FROM catalog.InmuebleFoto f
+booking-service\src\models\reserva.model.js:845:      FROM booking.ReservaEvento e
+booking-service\src\models\reserva.model.js:846:      INNER JOIN booking.Reserva r
+booking-service\src\models\reserva.model.js:848:      LEFT JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:850:      LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:926:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:927:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:929:      INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:931:      INNER JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:933:      LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:941:            FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:969:      FROM booking.Reserva
+booking-service\src\models\reserva.model.js:992:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:993:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:995:      LEFT JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1018:      FROM booking.EvaluacionInquilino ei
+booking-service\src\models\reserva.model.js:1019:      LEFT JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:1021:      LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:1053:      INSERT INTO booking.EvaluacionInquilino (
+booking-service\src\models\reserva.model.js:1098:      FROM booking.EvaluacionInquilino
+booking-service\src\models\reserva.model.js:1120:      INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:1167:      FROM booking.EvaluacionInquilino ei
+booking-service\src\models\reserva.model.js:1168:      INNER JOIN booking.Reserva r
+booking-service\src\models\reserva.model.js:1170:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1172:      INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1174:      LEFT JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:1176:      LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:1184:            FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:1223:        INSERT INTO booking.EvaluacionInquilino (
+booking-service\src\models\reserva.model.js:1260:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:1314:        UPDATE r
+booking-service\src\models\reserva.model.js:1333:        FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:1334:        INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1336:        INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1344:              FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:1367:        UPDATE catalog.Inmueble
+booking-service\src\models\reserva.model.js:1382:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:1434:        UPDATE r
+booking-service\src\models\reserva.model.js:1455:        FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:1456:        INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1458:        INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1466:              FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:1489:        UPDATE catalog.Inmueble
+booking-service\src\models\reserva.model.js:1504:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:1567:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:1568:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1570:      LEFT JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1602:      FROM booking.SolicitudExtension
+booking-service\src\models\reserva.model.js:1638:      FROM catalog.BloqueoDisponibilidad b
+booking-service\src\models\reserva.model.js:1639:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1666:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:1667:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1719:        INSERT INTO booking.SolicitudExtension (
+booking-service\src\models\reserva.model.js:1743:        FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:1751:            FROM booking.SolicitudExtension se
+booking-service\src\models\reserva.model.js:1788:        INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:1864:      FROM booking.SolicitudExtension se
+booking-service\src\models\reserva.model.js:1865:      INNER JOIN booking.Reserva r
+booking-service\src\models\reserva.model.js:1867:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1869:      INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1871:      INNER JOIN auth.Usuario u
+booking-service\src\models\reserva.model.js:1873:      LEFT JOIN core.PerfilUsuario pu
+booking-service\src\models\reserva.model.js:1883:            FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:1947:        FROM booking.SolicitudExtension se
+booking-service\src\models\reserva.model.js:1950:        INNER JOIN booking.Reserva r
+booking-service\src\models\reserva.model.js:1953:        INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:1956:        INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:1978:              FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:2058:          FROM catalog.BloqueoDisponibilidad b
+booking-service\src\models\reserva.model.js:2059:          INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:2112:          FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:2113:          INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:2167:          UPDATE booking.SolicitudExtension
+booking-service\src\models\reserva.model.js:2215:          UPDATE booking.Reserva
+booking-service\src\models\reserva.model.js:2290:          INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:2365:          UPDATE se
+booking-service\src\models\reserva.model.js:2384:          FROM booking.SolicitudExtension se
+booking-service\src\models\reserva.model.js:2385:          INNER JOIN booking.Reserva r
+booking-service\src\models\reserva.model.js:2387:          INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:2389:          INNER JOIN catalog.Publicacion p
+booking-service\src\models\reserva.model.js:2403:                FROM core.EmpresaSecretario es
+booking-service\src\models\reserva.model.js:2459:          INSERT INTO booking.ReservaEvento (
+booking-service\src\models\reserva.model.js:2538:      FROM booking.Reserva r
+booking-service\src\models\reserva.model.js:2539:      INNER JOIN catalog.Inmueble i
+booking-service\src\models\reserva.model.js:2546:        FROM catalog.Publicacion p
+booking-service\src\models\reserva.model.js:2572:        UPDATE booking.Reserva
+booking-service\src\models\reserva.model.js:2609:        UPDATE finance.Recibo
+booking-service\src\models\reserva.model.js:2666:      FROM finance.Recibo r
+

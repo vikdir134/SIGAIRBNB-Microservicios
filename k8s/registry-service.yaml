@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: registry-service
-          image: sigairbnb-microservicios-registry-service:latest
+          image: staype-microservices-registry-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8761

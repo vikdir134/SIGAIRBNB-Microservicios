@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: sigairbnb-microservicios-api-gateway:latest
+          image: staype-microservices-api-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

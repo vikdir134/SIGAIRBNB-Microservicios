@@ -1,0 +1,38 @@
+
+auth-service\src\models\auth.model.js:20:      FROM auth.Usuario
+auth-service\src\models\auth.model.js:54:        INSERT INTO core.Empresa (
+auth-service\src\models\auth.model.js:89:        INSERT INTO auth.Usuario (
+auth-service\src\models\auth.model.js:125:        INSERT INTO core.PerfilUsuario (
+auth-service\src\models\auth.model.js:145:        INSERT INTO auth.UsuarioRol (
+auth-service\src\models\auth.model.js:152:        FROM auth.Rol
+auth-service\src\models\auth.model.js:175:      FROM auth.UsuarioRol ur
+auth-service\src\models\auth.model.js:176:      INNER JOIN auth.Rol r
+auth-service\src\models\auth.model.js:192:      UPDATE auth.Usuario
+auth-service\src\models\auth.model.js:231:      FROM auth.Usuario u
+auth-service\src\models\auth.model.js:232:      INNER JOIN core.PerfilUsuario p
+auth-service\src\models\auth.model.js:250:      INSERT INTO auth.TokenVerificacionEmail (
+auth-service\src\models\auth.model.js:285:        FROM auth.TokenVerificacionEmail
+auth-service\src\models\auth.model.js:323:        UPDATE auth.Usuario
+auth-service\src\models\auth.model.js:335:        UPDATE auth.TokenVerificacionEmail
+auth-service\src\models\auth.model.js:361:      INSERT INTO auth.TokenRecuperacionPassword (
+auth-service\src\models\auth.model.js:400:        FROM auth.TokenRecuperacionPassword
+auth-service\src\models\auth.model.js:436:        UPDATE auth.Usuario
+auth-service\src\models\auth.model.js:447:        UPDATE auth.TokenRecuperacionPassword
+auth-service\src\models\notificacion.model.js:25:      INSERT INTO auth.Notificacion (
+auth-service\src\models\notificacion.model.js:85:      FROM auth.Notificacion n
+auth-service\src\models\notificacion.model.js:100:      FROM auth.Notificacion
+auth-service\src\models\notificacion.model.js:116:      UPDATE auth.Notificacion
+auth-service\src\models\notificacion.model.js:147:      UPDATE auth.Notificacion
+auth-service\src\models\perfil.model.js:31:      FROM auth.Usuario u
+auth-service\src\models\perfil.model.js:32:      INNER JOIN core.PerfilUsuario p
+auth-service\src\models\perfil.model.js:67:      UPDATE p
+auth-service\src\models\perfil.model.js:79:      FROM core.PerfilUsuario p
+auth-service\src\models\perfil.model.js:80:      INNER JOIN auth.Usuario u
+auth-service\src\models\perfil.model.js:108:      FROM auth.Usuario u
+auth-service\src\models\perfil.model.js:109:      INNER JOIN core.PerfilUsuario p
+auth-service\src\models\perfil.model.js:132:      UPDATE p
+auth-service\src\models\perfil.model.js:138:      FROM core.PerfilUsuario p
+auth-service\src\models\perfil.model.js:139:      INNER JOIN auth.Usuario u
+auth-service\src\models\perfil.model.js:167:      FROM auth.Usuario u
+auth-service\src\models\perfil.model.js:168:      INNER JOIN core.PerfilUsuario p
+

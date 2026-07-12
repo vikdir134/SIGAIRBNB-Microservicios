@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: catalog-service
-          image: sigairbnb-microservicios-catalog-service:latest
+          image: staype-microservices-catalog-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8082

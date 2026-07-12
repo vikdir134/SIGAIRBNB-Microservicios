@@ -1,0 +1,19 @@
+
+FullName
+--------
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\auth-service\src\models\auth.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\auth-service\src\models\notificacion.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\auth-service\src\models\perfil.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\catalog-service\src\models\disponibilidad.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\catalog-service\src\models\edificio.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\catalog-service\src\models\publicacion.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\booking-service\src\models\notificacion.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\booking-service\src\models\reserva.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\conceptoCobro.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\ingresoAlquiler.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\mantenimiento.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\pago.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\recibo.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\reporte.model.js
+C:\Users\vikdi\OneDrive\Escritorio\VII CICLO\Proyecto Desarollo de Aplicaciones Web\staype-microservices\finance-service\src\models\tarifa.model.js
+

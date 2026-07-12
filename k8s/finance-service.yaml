@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: finance-service
-          image: sigairbnb-microservicios-finance-service:latest
+          image: staype-microservices-finance-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8084

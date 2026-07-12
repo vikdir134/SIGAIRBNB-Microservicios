@@ -1,0 +1,89 @@
+
+catalog-service\src\models\disponibilidad.model.js:19:      FROM catalog.Inmueble
+catalog-service\src\models\disponibilidad.model.js:49:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:50:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:81:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:82:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:121:        INSERT INTO catalog.BloqueoDisponibilidad (
+catalog-service\src\models\disponibilidad.model.js:166:          FROM catalog.Inmueble
+catalog-service\src\models\disponibilidad.model.js:185:            INSERT INTO catalog.BloqueoDisponibilidad (
+catalog-service\src\models\disponibilidad.model.js:253:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:254:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:273:      UPDATE b
+catalog-service\src\models\disponibilidad.model.js:285:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:286:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:325:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:326:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:369:      FROM booking.Reserva r
+catalog-service\src\models\disponibilidad.model.js:370:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:412:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:413:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:448:      UPDATE b
+catalog-service\src\models\disponibilidad.model.js:463:      FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\disponibilidad.model.js:464:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:509:      FROM catalog.Inmueble i
+catalog-service\src\models\disponibilidad.model.js:510:      LEFT JOIN catalog.Inmueble edificio
+catalog-service\src\models\edificio.model.js:17:      FROM catalog.Inmueble
+catalog-service\src\models\edificio.model.js:64:      INSERT INTO catalog.Inmueble (
+catalog-service\src\models\edificio.model.js:155:      FROM catalog.Inmueble
+catalog-service\src\models\edificio.model.js:188:      FROM catalog.Inmueble
+catalog-service\src\models\edificio.model.js:235:      INSERT INTO catalog.Inmueble (
+catalog-service\src\models\edificio.model.js:312:      FROM catalog.Inmueble e
+catalog-service\src\models\edificio.model.js:353:      FROM catalog.Inmueble unidad
+catalog-service\src\models\edificio.model.js:354:      INNER JOIN catalog.Inmueble edificio
+catalog-service\src\models\edificio.model.js:390:      FROM catalog.Inmueble
+catalog-service\src\models\edificio.model.js:449:      FROM catalog.Inmueble unidad
+catalog-service\src\models\edificio.model.js:450:      INNER JOIN catalog.Inmueble edificio
+catalog-service\src\models\edificio.model.js:509:      FROM catalog.Inmueble i
+catalog-service\src\models\edificio.model.js:510:      LEFT JOIN catalog.Inmueble edificio
+catalog-service\src\models\edificio.model.js:574:      FROM catalog.Inmueble i
+catalog-service\src\models\edificio.model.js:575:      LEFT JOIN catalog.Inmueble edificio
+catalog-service\src\models\edificio.model.js:593:      FROM catalog.Inmueble
+catalog-service\src\models\edificio.model.js:611:      UPDATE catalog.Inmueble
+catalog-service\src\models\edificio.model.js:699:      UPDATE catalog.Inmueble
+catalog-service\src\models\edificio.model.js:832:      FROM catalog.Caracteristica
+catalog-service\src\models\edificio.model.js:858:      FROM catalog.InmuebleCaracteristica ic
+catalog-service\src\models\edificio.model.js:859:      INNER JOIN catalog.Caracteristica c
+catalog-service\src\models\edificio.model.js:861:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\edificio.model.js:887:        FROM catalog.InmuebleCaracteristica ic
+catalog-service\src\models\edificio.model.js:888:        INNER JOIN catalog.Inmueble i
+catalog-service\src\models\edificio.model.js:905:          INSERT INTO catalog.InmuebleCaracteristica (
+catalog-service\src\models\publicacion.model.js:78:        FROM catalog.BloqueoDisponibilidad b
+catalog-service\src\models\publicacion.model.js:89:        FROM booking.Reserva r
+catalog-service\src\models\publicacion.model.js:128:    FROM catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:129:    INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:134:      FROM catalog.InmuebleFoto f
+catalog-service\src\models\publicacion.model.js:196:      FROM catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:197:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:226:      FROM catalog.InmuebleFoto
+catalog-service\src\models\publicacion.model.js:282:      FROM catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:283:      LEFT JOIN catalog.Inmueble edificio
+catalog-service\src\models\publicacion.model.js:285:      LEFT JOIN catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:322:      FROM catalog.Inmueble
+catalog-service\src\models\publicacion.model.js:349:      FROM catalog.Publicacion
+catalog-service\src\models\publicacion.model.js:384:      INSERT INTO catalog.Publicacion (
+catalog-service\src\models\publicacion.model.js:448:      FROM catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:449:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:480:          UPDATE catalog.InmuebleFoto
+catalog-service\src\models\publicacion.model.js:496:        INSERT INTO catalog.InmuebleFoto (
+catalog-service\src\models\publicacion.model.js:540:      FROM catalog.InmuebleFoto
+catalog-service\src\models\publicacion.model.js:554:      UPDATE p
+catalog-service\src\models\publicacion.model.js:569:      FROM catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:570:      INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:599:        FROM catalog.InmuebleFoto f
+catalog-service\src\models\publicacion.model.js:600:        INNER JOIN catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:602:        INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:616:        FROM catalog.InmuebleFoto f
+catalog-service\src\models\publicacion.model.js:617:        INNER JOIN catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:619:        INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:638:        FROM catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:639:        INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:677:        FROM catalog.InmuebleFoto f
+catalog-service\src\models\publicacion.model.js:678:        INNER JOIN catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:680:        INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:693:        FROM catalog.InmuebleFoto f
+catalog-service\src\models\publicacion.model.js:694:        INNER JOIN catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:696:        INNER JOIN catalog.Inmueble i
+catalog-service\src\models\publicacion.model.js:714:        FROM catalog.Publicacion p
+catalog-service\src\models\publicacion.model.js:715:        INNER JOIN catalog.Inmueble i
+

@@ -1,0 +1,185 @@
+
+finance-service\src\models\conceptoCobro.model.js:28:    FROM finance.ConceptoCobro
+finance-service\src\models\conceptoCobro.model.js:63:      FROM finance.ConceptoCobro
+finance-service\src\models\conceptoCobro.model.js:80:      FROM finance.ConceptoCobro
+finance-service\src\models\conceptoCobro.model.js:107:      INSERT INTO finance.ConceptoCobro (
+finance-service\src\models\conceptoCobro.model.js:170:      UPDATE finance.ConceptoCobro
+finance-service\src\models\conceptoCobro.model.js:202:      UPDATE finance.ConceptoCobro
+finance-service\src\models\ingresoAlquiler.model.js:17:    FROM finance.CategoriaMovimiento
+finance-service\src\models\ingresoAlquiler.model.js:42:      FROM finance.CuentaBancaria cb
+finance-service\src\models\ingresoAlquiler.model.js:43:      INNER JOIN finance.Banco b
+finance-service\src\models\ingresoAlquiler.model.js:94:      FROM finance.Recibo r
+finance-service\src\models\ingresoAlquiler.model.js:95:      INNER JOIN booking.Reserva res
+finance-service\src\models\ingresoAlquiler.model.js:97:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\ingresoAlquiler.model.js:99:      INNER JOIN auth.Usuario u
+finance-service\src\models\ingresoAlquiler.model.js:101:      LEFT JOIN core.PerfilUsuario pu
+finance-service\src\models\ingresoAlquiler.model.js:126:      FROM finance.CuentaBancaria
+finance-service\src\models\ingresoAlquiler.model.js:146:      FROM finance.CategoriaMovimiento
+finance-service\src\models\ingresoAlquiler.model.js:181:      FROM finance.Recibo r
+finance-service\src\models\ingresoAlquiler.model.js:182:      INNER JOIN booking.Reserva res
+finance-service\src\models\ingresoAlquiler.model.js:184:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\ingresoAlquiler.model.js:229:        FROM finance.CuentaBancaria WITH (UPDLOCK, ROWLOCK)
+finance-service\src\models\ingresoAlquiler.model.js:249:        FROM finance.CategoriaMovimiento
+finance-service\src\models\ingresoAlquiler.model.js:279:        FROM finance.Recibo r WITH (UPDLOCK, ROWLOCK)
+finance-service\src\models\ingresoAlquiler.model.js:280:        INNER JOIN booking.Reserva res
+finance-service\src\models\ingresoAlquiler.model.js:282:        INNER JOIN catalog.Inmueble i
+finance-service\src\models\ingresoAlquiler.model.js:355:        INSERT INTO finance.Pago (
+finance-service\src\models\ingresoAlquiler.model.js:415:        INSERT INTO finance.MovimientoBancario (
+finance-service\src\models\ingresoAlquiler.model.js:458:        UPDATE finance.CuentaBancaria
+finance-service\src\models\ingresoAlquiler.model.js:468:        UPDATE finance.Recibo
+finance-service\src\models\ingresoAlquiler.model.js:553:      FROM finance.Pago p
+finance-service\src\models\ingresoAlquiler.model.js:554:      INNER JOIN finance.Recibo r
+finance-service\src\models\ingresoAlquiler.model.js:556:      INNER JOIN booking.Reserva res
+finance-service\src\models\ingresoAlquiler.model.js:558:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\ingresoAlquiler.model.js:560:      LEFT JOIN core.PerfilUsuario pu
+finance-service\src\models\ingresoAlquiler.model.js:562:      LEFT JOIN finance.MovimientoBancario mb
+finance-service\src\models\mantenimiento.model.js:13:    FROM finance.CategoriaMovimiento
+finance-service\src\models\mantenimiento.model.js:38:      FROM finance.CuentaBancaria cb
+finance-service\src\models\mantenimiento.model.js:39:      INNER JOIN finance.Banco b
+finance-service\src\models\mantenimiento.model.js:65:      FROM catalog.Inmueble
+finance-service\src\models\mantenimiento.model.js:88:      FROM finance.CuentaBancaria
+finance-service\src\models\mantenimiento.model.js:108:      FROM finance.CategoriaMovimiento
+finance-service\src\models\mantenimiento.model.js:131:      FROM catalog.Inmueble
+finance-service\src\models\mantenimiento.model.js:157:        FROM finance.CuentaBancaria
+finance-service\src\models\mantenimiento.model.js:188:        INSERT INTO finance.MovimientoBancario (
+finance-service\src\models\mantenimiento.model.js:229:        UPDATE finance.CuentaBancaria
+finance-service\src\models\mantenimiento.model.js:272:      FROM finance.MovimientoBancario mb
+finance-service\src\models\mantenimiento.model.js:273:      INNER JOIN finance.CategoriaMovimiento cm
+finance-service\src\models\mantenimiento.model.js:275:      INNER JOIN finance.CuentaBancaria cb
+finance-service\src\models\mantenimiento.model.js:277:      LEFT JOIN catalog.Inmueble i
+finance-service\src\models\pago.model.js:37:      FROM finance.Recibo r
+finance-service\src\models\pago.model.js:38:      INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\pago.model.js:40:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\pago.model.js:42:      INNER JOIN booking.Reserva res
+finance-service\src\models\pago.model.js:44:      LEFT JOIN core.PerfilUsuario pu
+finance-service\src\models\pago.model.js:80:      FROM finance.Recibo r
+finance-service\src\models\pago.model.js:81:      INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\pago.model.js:83:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\pago.model.js:85:      INNER JOIN booking.Reserva res
+finance-service\src\models\pago.model.js:136:        FROM finance.Recibo r WITH (UPDLOCK, ROWLOCK)
+finance-service\src\models\pago.model.js:137:        INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\pago.model.js:139:        INNER JOIN catalog.Inmueble i
+finance-service\src\models\pago.model.js:141:        INNER JOIN booking.Reserva res
+finance-service\src\models\pago.model.js:207:        INSERT INTO finance.Pago (
+finance-service\src\models\pago.model.js:247:        FROM finance.CategoriaMovimiento
+finance-service\src\models\pago.model.js:273:        FROM finance.CuentaBancaria WITH (UPDLOCK, ROWLOCK)
+finance-service\src\models\pago.model.js:314:        INSERT INTO finance.MovimientoBancario (
+finance-service\src\models\pago.model.js:357:        UPDATE finance.CuentaBancaria
+finance-service\src\models\pago.model.js:365:        UPDATE finance.Recibo
+finance-service\src\models\pago.model.js:426:      FROM finance.Pago p
+finance-service\src\models\pago.model.js:427:      INNER JOIN finance.Recibo r
+finance-service\src\models\pago.model.js:429:      INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\pago.model.js:431:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\pago.model.js:433:      INNER JOIN booking.Reserva res
+finance-service\src\models\pago.model.js:471:        FROM booking.Reserva r
+finance-service\src\models\pago.model.js:472:        INNER JOIN catalog.Inmueble i
+finance-service\src\models\pago.model.js:513:        FROM finance.CuentaCobroInmueble
+finance-service\src\models\pago.model.js:525:          INSERT INTO finance.CuentaCobroInmueble (
+finance-service\src\models\pago.model.js:567:          FROM finance.Recibo
+finance-service\src\models\pago.model.js:613:        INSERT INTO finance.Recibo (
+finance-service\src\models\recibo.model.js:210:      FROM booking.Reserva r
+finance-service\src\models\recibo.model.js:211:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\recibo.model.js:213:      INNER JOIN core.Empresa e
+finance-service\src\models\recibo.model.js:215:      INNER JOIN catalog.Publicacion p
+finance-service\src\models\recibo.model.js:217:      INNER JOIN auth.Usuario u
+finance-service\src\models\recibo.model.js:219:      LEFT JOIN core.PerfilUsuario pu
+finance-service\src\models\recibo.model.js:230:            FROM core.EmpresaSecretario es
+finance-service\src\models\recibo.model.js:238:            FROM auth.Usuario ua
+finance-service\src\models\recibo.model.js:239:            INNER JOIN auth.UsuarioRol ur
+finance-service\src\models\recibo.model.js:241:            INNER JOIN auth.Rol rol
+finance-service\src\models\recibo.model.js:270:      FROM finance.CuentaCobroInmueble
+finance-service\src\models\recibo.model.js:286:      INSERT INTO finance.CuentaCobroInmueble (
+finance-service\src\models\recibo.model.js:330:      FROM finance.ConceptoCobro
+finance-service\src\models\recibo.model.js:606:  FROM finance.Recibo r2
+finance-service\src\models\recibo.model.js:607:  INNER JOIN booking.Reserva res2
+finance-service\src\models\recibo.model.js:609:  INNER JOIN catalog.Inmueble i2
+finance-service\src\models\recibo.model.js:636:      FROM finance.Recibo r
+finance-service\src\models\recibo.model.js:637:      INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\recibo.model.js:639:      LEFT JOIN booking.Reserva res
+finance-service\src\models\recibo.model.js:641:      LEFT JOIN catalog.Inmueble i
+finance-service\src\models\recibo.model.js:643:      LEFT JOIN core.Empresa e
+finance-service\src\models\recibo.model.js:645:      LEFT JOIN auth.Usuario u
+finance-service\src\models\recibo.model.js:647:      LEFT JOIN core.PerfilUsuario pu
+finance-service\src\models\recibo.model.js:675:      FROM finance.ReciboDetalle rd
+finance-service\src\models\recibo.model.js:676:      INNER JOIN finance.ConceptoCobro cc
+finance-service\src\models\recibo.model.js:726:      FROM finance.Recibo
+finance-service\src\models\recibo.model.js:854:        FROM finance.Recibo
+finance-service\src\models\recibo.model.js:951:        INSERT INTO finance.Recibo (
+finance-service\src\models\recibo.model.js:1009:          INSERT INTO finance.ReciboDetalle (
+finance-service\src\models\recibo.model.js:1099:  FROM finance.Recibo r2
+finance-service\src\models\recibo.model.js:1100:  INNER JOIN booking.Reserva res2
+finance-service\src\models\recibo.model.js:1102:  INNER JOIN catalog.Inmueble i2
+finance-service\src\models\recibo.model.js:1113:      FROM finance.Recibo r
+finance-service\src\models\recibo.model.js:1114:      INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\recibo.model.js:1116:      INNER JOIN booking.Reserva res
+finance-service\src\models\recibo.model.js:1118:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\recibo.model.js:1127:            FROM catalog.Publicacion p
+finance-service\src\models\recibo.model.js:1134:            FROM core.EmpresaSecretario es
+finance-service\src\models\recibo.model.js:1142:            FROM auth.Usuario ua
+finance-service\src\models\recibo.model.js:1143:            INNER JOIN auth.UsuarioRol ur
+finance-service\src\models\recibo.model.js:1145:            INNER JOIN auth.Rol rol
+finance-service\src\models\recibo.model.js:1173:      FROM finance.Recibo r
+finance-service\src\models\recibo.model.js:1174:      INNER JOIN booking.Reserva res
+finance-service\src\models\recibo.model.js:1176:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\recibo.model.js:1185:            FROM catalog.Publicacion p
+finance-service\src\models\recibo.model.js:1192:            FROM core.EmpresaSecretario es
+finance-service\src\models\recibo.model.js:1200:            FROM auth.Usuario ua
+finance-service\src\models\recibo.model.js:1201:            INNER JOIN auth.UsuarioRol ur
+finance-service\src\models\recibo.model.js:1203:            INNER JOIN auth.Rol rol
+finance-service\src\models\reporte.model.js:55:      FROM reporting.v_ResumenFinancieroMensual
+finance-service\src\models\reporte.model.js:99:      FROM finance.MovimientoBancario mb
+finance-service\src\models\reporte.model.js:100:      INNER JOIN finance.CuentaBancaria cb
+finance-service\src\models\reporte.model.js:102:      INNER JOIN finance.CategoriaMovimiento cm
+finance-service\src\models\reporte.model.js:104:      INNER JOIN finance.Banco b
+finance-service\src\models\reporte.model.js:106:      LEFT JOIN catalog.Inmueble i
+finance-service\src\models\reporte.model.js:153:      FROM reporting.v_ResumenFinancieroMensual
+finance-service\src\models\reporte.model.js:200:      FROM finance.MovimientoBancario mb
+finance-service\src\models\reporte.model.js:201:      INNER JOIN finance.CuentaBancaria cb
+finance-service\src\models\reporte.model.js:203:      INNER JOIN finance.CategoriaMovimiento cm
+finance-service\src\models\reporte.model.js:205:      LEFT JOIN catalog.Inmueble i
+finance-service\src\models\reporte.model.js:224:      FROM catalog.Inmueble
+finance-service\src\models\reporte.model.js:240:      FROM booking.Reserva r
+finance-service\src\models\reporte.model.js:241:      INNER JOIN InmueblesEmpresa i
+finance-service\src\models\reporte.model.js:256:      FROM ReservasPeriodo
+finance-service\src\models\reporte.model.js:262:      FROM InmueblesEmpresa
+finance-service\src\models\reporte.model.js:278:    FROM BaseCalculo b
+finance-service\src\models\reporte.model.js:279:    CROSS JOIN DiasOcupados d;
+finance-service\src\models\reporte.model.js:289:    FROM booking.Reserva r
+finance-service\src\models\reporte.model.js:290:    INNER JOIN catalog.Inmueble i
+finance-service\src\models\reporte.model.js:319:      FROM booking.Reserva r
+finance-service\src\models\reporte.model.js:340:    FROM catalog.Inmueble i
+finance-service\src\models\reporte.model.js:341:    LEFT JOIN ReservasPeriodo rp
+finance-service\src\models\reporte.model.js:363:    FROM finance.Recibo rec
+finance-service\src\models\reporte.model.js:364:    INNER JOIN booking.Reserva r
+finance-service\src\models\reporte.model.js:366:    INNER JOIN catalog.Inmueble i
+finance-service\src\models\reporte.model.js:385:    FROM finance.Recibo rec
+finance-service\src\models\reporte.model.js:386:    INNER JOIN booking.Reserva r
+finance-service\src\models\reporte.model.js:388:    INNER JOIN catalog.Inmueble i
+finance-service\src\models\reporte.model.js:595:        FROM finance.Pago p
+finance-service\src\models\reporte.model.js:611:        FROM finance.Pago p
+finance-service\src\models\reporte.model.js:713:        FROM finance.Recibo r
+finance-service\src\models\reporte.model.js:715:        INNER JOIN finance.CuentaCobroInmueble cc
+finance-service\src\models\reporte.model.js:718:        INNER JOIN catalog.Inmueble i
+finance-service\src\models\reporte.model.js:721:        INNER JOIN booking.Reserva res
+finance-service\src\models\reporte.model.js:724:        INNER JOIN auth.Usuario u
+finance-service\src\models\reporte.model.js:727:        LEFT JOIN core.PerfilUsuario pu
+finance-service\src\models\reporte.model.js:730:        LEFT JOIN pagos_confirmados pc
+finance-service\src\models\reporte.model.js:733:        LEFT JOIN pagos_confirmados_periodo pcp
+finance-service\src\models\reporte.model.js:742:          FROM finance.Pago p2
+finance-service\src\models\reporte.model.js:798:      FROM base_reporte
+finance-service\src\models\tarifa.model.js:19:    FROM finance.IndiceIPC
+finance-service\src\models\tarifa.model.js:40:      FROM finance.IndiceIPC
+finance-service\src\models\tarifa.model.js:56:      INSERT INTO finance.IndiceIPC (
+finance-service\src\models\tarifa.model.js:95:      FROM catalog.Inmueble i
+finance-service\src\models\tarifa.model.js:96:      LEFT JOIN catalog.Publicacion p
+finance-service\src\models\tarifa.model.js:129:      FROM catalog.Inmueble
+finance-service\src\models\tarifa.model.js:157:      FROM finance.TarifaInmueble
+finance-service\src\models\tarifa.model.js:172:      UPDATE finance.TarifaInmueble
+finance-service\src\models\tarifa.model.js:201:      INSERT INTO finance.TarifaInmueble (
+finance-service\src\models\tarifa.model.js:242:      UPDATE catalog.Inmueble
+finance-service\src\models\tarifa.model.js:261:      UPDATE catalog.Publicacion
+finance-service\src\models\tarifa.model.js:388:      FROM finance.TarifaInmueble t
+finance-service\src\models\tarifa.model.js:389:      INNER JOIN catalog.Inmueble i
+finance-service\src\models\tarifa.model.js:391:      LEFT JOIN finance.IndiceIPC ipc
+finance-service\src\models\tarifa.model.js:393:      LEFT JOIN core.PerfilUsuario pu
+
