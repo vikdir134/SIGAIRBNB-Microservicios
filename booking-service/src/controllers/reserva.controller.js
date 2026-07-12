@@ -28,7 +28,8 @@ const {
   rechazarSolicitudExtensionReservaGestion,
   obtenerReservaParaCancelacionInquilino,
   cancelarReservaPorInquilino,
-  obtenerEstadoFinancieroReserva
+  obtenerEstadoFinancieroReserva,
+  listarReservasPorRangoInternoModel
 } = require('../models/reserva.model');
 
 const {
@@ -1945,6 +1946,58 @@ const cancelarReservaInquilino = async (req, res) => {
     });
   }
 };
+
+const listarReservasPorRangoInterno = async (req, res) => {
+  try {
+    const {
+      inmueble_id,
+      fecha_inicio,
+      fecha_fin,
+      estados
+    } = req.query;
+
+    const inmuebleIdNumero = Number(inmueble_id);
+
+    if (
+      Number.isNaN(inmuebleIdNumero) ||
+      inmuebleIdNumero <= 0 ||
+      !fecha_inicio ||
+      !fecha_fin
+    ) {
+      return res.status(400).json({
+        mensaje: 'Debe enviar inmueble_id, fecha_inicio y fecha_fin válidos'
+      });
+    }
+
+    const estadosLista = estados
+      ? String(estados)
+          .split(',')
+          .map((estado) => estado.trim().toUpperCase())
+      : ['SOLICITADA', 'APROBADA', 'ACTIVA'];
+
+    const reservas = await listarReservasPorRangoInternoModel({
+      inmueble_id: inmuebleIdNumero,
+      fecha_inicio,
+      fecha_fin,
+      estados: estadosLista
+    });
+
+    return res.json({
+      mensaje: 'Reservas por rango obtenidas correctamente',
+      total: reservas.length,
+      reservas
+    });
+
+  } catch (error) {
+    console.error('Error interno al listar reservas por rango:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al listar reservas por rango',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   solicitarReserva,
   obtenerMisSolicitudesReserva,
@@ -1962,5 +2015,6 @@ module.exports = {
   solicitarExtensionReserva,
   aprobarSolicitudExtension,
   rechazarSolicitudExtension,
-  cancelarReservaInquilino
+  cancelarReservaInquilino,
+  listarReservasPorRangoInterno
 };

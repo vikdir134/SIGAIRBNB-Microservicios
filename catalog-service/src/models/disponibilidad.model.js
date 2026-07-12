@@ -340,50 +340,6 @@ const listarBloqueosPorRango = async (
   return result.recordset;
 };
 
-const listarReservasPorRango = async (
-  empresa_id,
-  inmueble_id,
-  fecha_inicio,
-  fecha_fin
-) => {
-  const pool = await getConnection();
-
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('fecha_inicio', sql.Date, fecha_inicio)
-    .input('fecha_fin', sql.Date, fecha_fin)
-    .query(`
-      SELECT
-        r.reserva_id,
-        r.inmueble_id,
-        r.inquilino_id,
-        r.estado_reserva,
-        r.fecha_solicitud,
-        r.fecha_inicio,
-        r.fecha_fin,
-        r.renta_pactada_mensual,
-        r.monto_total_estimado,
-        r.moneda,
-        r.observacion_inquilino
-      FROM booking.Reserva r
-      INNER JOIN catalog.Inmueble i
-        ON i.inmueble_id = r.inmueble_id
-      WHERE r.inmueble_id = @inmueble_id
-        AND i.empresa_id = @empresa_id
-        AND i.activo = 1
-        AND i.deleted_at IS NULL
-        AND r.estado_reserva IN ('SOLICITADA', 'APROBADA', 'ACTIVA')
-        AND (
-          @fecha_inicio <= r.fecha_fin
-          AND @fecha_fin >= r.fecha_inicio
-        )
-      ORDER BY r.fecha_inicio ASC;
-    `);
-
-  return result.recordset;
-};
-
 const buscarBloqueosSolapadosExcepto = async (
   empresa_id,
   inmueble_id,
@@ -534,7 +490,6 @@ module.exports = {
   buscarBloqueoPorId,
   cancelarBloqueoDisponibilidad,
   listarBloqueosPorRango,
-  listarReservasPorRango,
   buscarBloqueosSolapadosExcepto,
   actualizarBloqueoDisponibilidad,
   listarInmueblesParaDisponibilidad

@@ -2672,6 +2672,69 @@ const obtenerEstadoFinancieroReserva = async (input) => {
   return result.recordset[0] || null;
 };
 
+const listarReservasPorRangoInternoModel = async ({
+  inmueble_id,
+  fecha_inicio,
+  fecha_fin,
+  estados
+}) => {
+  const pool = await getConnection();
+
+  const estadosPermitidos = [
+    'SOLICITADA',
+    'APROBADA',
+    'ACTIVA',
+    'FINALIZADA',
+    'CANCELADA',
+    'RECHAZADA',
+    'EXPIRADA'
+  ];
+
+  const estadosFiltrados = Array.isArray(estados)
+    ? estados.filter((estado) => estadosPermitidos.includes(estado))
+    : ['SOLICITADA', 'APROBADA', 'ACTIVA'];
+
+  if (estadosFiltrados.length === 0) {
+    return [];
+  }
+
+  const request = pool.request()
+    .input('inmueble_id', sql.Int, inmueble_id)
+    .input('fecha_inicio', sql.Date, fecha_inicio)
+    .input('fecha_fin', sql.Date, fecha_fin);
+
+  const parametrosEstado = estadosFiltrados.map((estado, index) => {
+    const nombreParametro = `estado_${index}`;
+    request.input(nombreParametro, sql.NVarChar(30), estado);
+    return `@${nombreParametro}`;
+  });
+
+  const result = await request.query(`
+    SELECT
+      r.reserva_id,
+      r.inmueble_id,
+      r.inquilino_id,
+      r.estado_reserva,
+      r.fecha_solicitud,
+      r.fecha_inicio,
+      r.fecha_fin,
+      r.renta_pactada_mensual,
+      r.monto_total_estimado,
+      r.moneda,
+      r.observacion_inquilino
+    FROM booking.Reserva r
+    WHERE r.inmueble_id = @inmueble_id
+      AND r.estado_reserva IN (${parametrosEstado.join(', ')})
+      AND (
+        @fecha_inicio <= r.fecha_fin
+        AND @fecha_fin >= r.fecha_inicio
+      )
+    ORDER BY r.fecha_inicio ASC;
+  `);
+
+  return result.recordset;
+};
+
 module.exports = {
   obtenerPublicacionReservablePorId,
   buscarConflictosReserva,
@@ -2702,5 +2765,6 @@ module.exports = {
   rechazarSolicitudExtensionReservaGestion,
   obtenerReservaParaCancelacionInquilino,
   cancelarReservaPorInquilino,
-  obtenerEstadoFinancieroReserva
+  obtenerEstadoFinancieroReserva,
+  listarReservasPorRangoInternoModel
 };

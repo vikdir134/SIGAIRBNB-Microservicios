@@ -6,11 +6,14 @@ const {
   buscarBloqueoPorId,
   cancelarBloqueoDisponibilidad,
   listarBloqueosPorRango,
-  listarReservasPorRango,
   buscarBloqueosSolapadosExcepto,
   actualizarBloqueoDisponibilidad,
   listarInmueblesParaDisponibilidad
 } = require('../models/disponibilidad.model');
+
+const {
+  listarReservasPorRango
+} = require('../clients/booking.client');
 
 const {
   isValidDateOnly,

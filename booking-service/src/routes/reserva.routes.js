@@ -18,7 +18,8 @@ const {
   solicitarExtensionReserva,
   aprobarSolicitudExtension,
   rechazarSolicitudExtension,
-  cancelarReservaInquilino
+  cancelarReservaInquilino,
+  listarReservasPorRangoInterno
 } = require('../controllers/reserva.controller');
 
 const {
@@ -33,6 +34,11 @@ router.get(
   '/mis-solicitudes',
   verificarToken,
   obtenerMisSolicitudesReserva
+);
+
+router.get(
+  '/internal/rango',
+  listarReservasPorRangoInterno
 );
 
 router.patch(

@@ -82,17 +82,6 @@ const listarPublicaciones = async (filtros = {}) => {
           AND @fecha_fin >= b.fecha_inicio
       )
     `);
-
-    condiciones.push(`
-      NOT EXISTS (
-        SELECT 1
-        FROM booking.Reserva r
-        WHERE r.inmueble_id = i.inmueble_id
-          AND r.estado_reserva IN ('APROBADA', 'ACTIVA')
-          AND @fecha_inicio <= r.fecha_fin
-          AND @fecha_fin >= r.fecha_inicio
-      )
-    `);
   }
 
   const result = await request.query(`

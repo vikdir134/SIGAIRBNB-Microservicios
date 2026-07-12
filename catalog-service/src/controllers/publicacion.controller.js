@@ -15,6 +15,10 @@ const {
 } = require('../models/publicacion.model');
 
 const {
+  tieneReservasConfirmadasPorRango
+} = require('../clients/booking.client');
+
+const {
   subirImagenACloudinary,
   eliminarImagenCloudinary
 } = require('../services/cloudinary.service');
@@ -169,7 +173,7 @@ const listarPublicacionesPublicas = async (req, res) => {
       });
     }
 
-    const publicaciones = await listarPublicaciones({
+    let publicaciones = await listarPublicaciones({
       ubicacion: limpiarTexto(ubicacion) || null,
       tipo_inmueble: tipoNormalizado || null,
       fecha_inicio: fecha_inicio || null,
@@ -178,6 +182,24 @@ const listarPublicacionesPublicas = async (req, res) => {
       precio_max,
       capacidad_personas
     });
+
+    if (fecha_inicio && fecha_fin && publicaciones.length > 0) {
+      const publicacionesFiltradas = [];
+
+      for (const publicacion of publicaciones) {
+        const tieneReservas = await tieneReservasConfirmadasPorRango(
+          publicacion.inmueble_id,
+          fecha_inicio,
+          fecha_fin
+        );
+
+        if (!tieneReservas) {
+          publicacionesFiltradas.push(publicacion);
+        }
+      }
+
+      publicaciones = publicacionesFiltradas;
+    }
 
     return res.json({
       mensaje: 'Publicaciones obtenidas correctamente',
