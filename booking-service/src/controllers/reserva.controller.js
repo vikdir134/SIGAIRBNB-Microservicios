@@ -34,7 +34,18 @@ const {
 const {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
-  listarSolicitudesGestionEmpresaMysqlModel
+  listarSolicitudesGestionEmpresaMysqlModel,
+  obtenerSolicitudInquilinoPorIdMysqlModel,
+  listarEventosReservaInquilinoMysqlModel,
+  obtenerSolicitudExtensionPendientePorReservaMysqlModel,
+  obtenerSolicitudGestionPorIdMysqlModel,
+  listarEventosReservaGestionMysqlModel,
+  obtenerExtensionPendienteReservaGestionMysqlModel,
+  listarEvaluacionesInquilinoReservaGestionMysqlModel,
+  obtenerUltimaEvaluacionInquilinoPorReservaMysqlModel,
+  obtenerResumenHistorialInquilinoMysqlModel,
+  listarHistorialReservasInquilinoMysqlModel,
+  registrarEvaluacionConEventoReservaGestionMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
@@ -908,25 +919,72 @@ const obtenerEventosReservaGestion = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La solicitud de reserva no existe'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tus publicaciones'
       });
     }
+
+    const solicitud = {
+      ...solicitudBase,
+
+      codigo_inmueble: publicacion.codigo_inmueble || null,
+      nombre_inmueble: publicacion.nombre_inmueble || null,
+      tipo_inmueble: publicacion.tipo_inmueble || null,
+      subtipo_unidad: publicacion.subtipo_unidad || null,
+      direccion_linea1: publicacion.direccion_linea1 || null,
+      numero: publicacion.numero || null,
+      distrito: publicacion.distrito || null,
+      ciudad: publicacion.ciudad || null,
+      provincia: publicacion.provincia || null,
+      departamento: publicacion.departamento || null,
+
+      publicacion_id: publicacion.publicacion_id || null,
+      titulo_publicacion: publicacion.titulo_publicacion || null,
+      precio_publicado_mensual: publicacion.precio_publicado_mensual || null,
+      publicado_por_usuario_id: publicacion.publicado_por_usuario_id || null,
+      foto_principal: publicacion.foto_principal || null
+    };
 
     const rolesUsuario = Array.isArray(req.usuario.roles)
       ? req.usuario.roles
       : [];
 
     const esAdmin = rolesUsuario.includes('ADMIN');
-    const esSecretario = rolesUsuario.includes('SECRETARIO');
+    const tieneRolSecretario = rolesUsuario.includes('SECRETARIO');
 
-    if (esSecretario && !esAdmin) {
+    if (tieneRolSecretario && !esAdmin) {
       const estadosPermitidosSecretario = [
         'APROBADA',
         'ACTIVA',
@@ -941,15 +999,10 @@ const obtenerEventosReservaGestion = async (req, res) => {
       }
     }
 
-    const eventos = await listarEventosReservaGestion(
-      usuarioPublicadorId,
-      reservaIdNumero
-    );
-
-    const solicitudExtensionPendiente =await obtenerExtensionPendienteReservaGestion(
-      usuarioPublicadorId,
-      reservaIdNumero
-    );
+    const [eventos, solicitudExtensionPendiente] = await Promise.all([
+      listarEventosReservaGestionMysqlModel(reservaIdNumero),
+      obtenerExtensionPendienteReservaGestionMysqlModel(reservaIdNumero)
+    ]);
 
     return res.json({
       mensaje: 'Historial de eventos de la reserva obtenido correctamente',
@@ -964,8 +1017,6 @@ const obtenerEventosReservaGestion = async (req, res) => {
         nombre_inmueble: solicitud.nombre_inmueble,
         tipo_inmueble: solicitud.tipo_inmueble
       },
-
-      // HU13
       solicitud_extension_pendiente: solicitudExtensionPendiente,
       total: eventos.length,
       eventos
@@ -994,30 +1045,56 @@ const obtenerDetalleMiSolicitudReserva = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudInquilinoPorId(
+    const solicitudBase = await obtenerSolicitudInquilinoPorIdMysqlModel(
       inquilinoId,
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tu usuario'
       });
     }
 
-    const eventos = await listarEventosReservaInquilino(
-      inquilinoId,
-      reservaIdNumero
-    );
+    const [publicacion, eventos, solicitudExtensionPendiente] =
+      await Promise.all([
+        obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+        listarEventosReservaInquilinoMysqlModel(
+          inquilinoId,
+          reservaIdNumero
+        ),
+        obtenerSolicitudExtensionPendientePorReservaMysqlModel(
+          reservaIdNumero
+        )
+      ]);
 
-    const solicitudExtensionPendiente = await obtenerSolicitudExtensionPendientePorReserva(
-    reservaIdNumero
-    );
+    const solicitud = {
+      ...solicitudBase,
+
+      codigo_inmueble: publicacion?.codigo_inmueble || null,
+      nombre_inmueble: publicacion?.nombre_inmueble || null,
+      tipo_inmueble: publicacion?.tipo_inmueble || null,
+      subtipo_unidad: publicacion?.subtipo_unidad || null,
+      direccion_linea1: publicacion?.direccion_linea1 || null,
+      numero: publicacion?.numero || null,
+      distrito: publicacion?.distrito || null,
+      ciudad: publicacion?.ciudad || null,
+      provincia: publicacion?.provincia || null,
+      departamento: publicacion?.departamento || null,
+
+      publicacion_id: publicacion?.publicacion_id || null,
+      titulo_publicacion: publicacion?.titulo_publicacion || null,
+      descripcion_corta: publicacion?.descripcion_corta || null,
+      precio_publicado_mensual:
+        publicacion?.precio_publicado_mensual || null,
+
+      foto_principal: publicacion?.foto_principal || null
+    };
 
     return res.json({
       mensaje: 'Detalle de solicitud de reserva obtenido correctamente',
       solicitud,
-      solicitudExtensionPendiente: solicitudExtensionPendiente,
+      solicitudExtensionPendiente,
       total_eventos: eventos.length,
       eventos
     });
@@ -1045,22 +1122,123 @@ const obtenerVettingInquilinoGestion = async (req, res) => {
       });
     }
 
-    const vetting = await obtenerVettingInquilinoReservaGestion(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!vetting) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La solicitud de reserva no existe'
+      });
+    }
+
+    const [
+      publicacion,
+      inquilino,
+      empresasSecretario,
+      resumenHistorial,
+      historialReservas,
+      evaluacionInquilino
+    ] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerResumenUsuario(solicitudBase.inquilino_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId),
+      obtenerResumenHistorialInquilinoMysqlModel(solicitudBase.inquilino_id),
+      listarHistorialReservasInquilinoMysqlModel(
+        solicitudBase.inquilino_id,
+        reservaIdNumero
+      ),
+      obtenerUltimaEvaluacionInquilinoPorReservaMysqlModel(reservaIdNumero)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    if (!inquilino) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inquilino asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    if (vetting.solicitud.inquilino_id === usuarioPublicadorId) {
+    if (solicitudBase.inquilino_id === usuarioPublicadorId) {
       return res.status(403).json({
         mensaje: 'No puedes revisar el vetting de tu propia solicitud de reserva'
       });
     }
+
+    const solicitud = {
+      ...solicitudBase,
+
+      codigo_inmueble: publicacion.codigo_inmueble || null,
+      nombre_inmueble: publicacion.nombre_inmueble || null,
+      tipo_inmueble: publicacion.tipo_inmueble || null,
+      subtipo_unidad: publicacion.subtipo_unidad || null,
+      direccion_linea1: publicacion.direccion_linea1 || null,
+      numero: publicacion.numero || null,
+      distrito: publicacion.distrito || null,
+      ciudad: publicacion.ciudad || null,
+      provincia: publicacion.provincia || null,
+      departamento: publicacion.departamento || null,
+
+      publicacion_id: publicacion.publicacion_id || null,
+      titulo_publicacion: publicacion.titulo_publicacion || null,
+      precio_publicado_mensual: publicacion.precio_publicado_mensual || null,
+      publicado_por_usuario_id: publicacion.publicado_por_usuario_id || null,
+
+      usuario_inquilino_id: inquilino.usuario_id,
+      correo_inquilino: inquilino.correo || null,
+      estado_usuario_inquilino: inquilino.estado || null,
+      email_verificado: inquilino.email_verificado || false,
+
+      perfil_usuario_id: inquilino.perfil_usuario_id || null,
+      nombres_inquilino: inquilino.nombres || null,
+      apellidos_inquilino: inquilino.apellidos || null,
+      tipo_documento: inquilino.tipo_documento || null,
+      numero_documento: inquilino.numero_documento || null,
+      telefono: inquilino.telefono || null,
+      fecha_nacimiento: inquilino.fecha_nacimiento || null,
+      sexo: inquilino.sexo || null,
+      foto_url: inquilino.foto_url || null,
+      biografia: inquilino.biografia || null,
+      direccion_inquilino: inquilino.direccion || null,
+      distrito_inquilino: inquilino.distrito || null,
+      ciudad_inquilino: inquilino.ciudad || null,
+      pais_inquilino: inquilino.pais || null,
+
+      ingreso_mensual_referencial:
+        inquilino.ingreso_mensual_referencial || null,
+      tiene_aval_bancario: inquilino.tiene_aval_bancario || false,
+      tiene_contrato_trabajo: inquilino.tiene_contrato_trabajo || false,
+      tiene_garante: inquilino.tiene_garante || false,
+      nombre_garante: inquilino.nombre_garante || null,
+      contacto_garante: inquilino.contacto_garante || null
+    };
+
+    const vetting = {
+      solicitud,
+      resumen_historial: resumenHistorial,
+      historial_reservas: historialReservas,
+      evaluacion_inquilino: evaluacionInquilino
+    };
 
     const resumenAutomatico = construirResumenVetting(vetting);
     const evaluacionSugerida = construirEvaluacionSugerida(resumenAutomatico);
@@ -1119,7 +1297,8 @@ const obtenerVettingInquilinoGestion = async (req, res) => {
           pais: vetting.solicitud.pais_inquilino
         },
         vetting_basico: {
-          ingreso_mensual_referencial: vetting.solicitud.ingreso_mensual_referencial,
+          ingreso_mensual_referencial:
+            vetting.solicitud.ingreso_mensual_referencial,
           tiene_aval_bancario: vetting.solicitud.tiene_aval_bancario,
           tiene_contrato_trabajo: vetting.solicitud.tiene_contrato_trabajo,
           tiene_garante: vetting.solicitud.tiene_garante,
@@ -1200,50 +1379,75 @@ const registrarEvaluacionInquilinoGestion = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La solicitud de reserva no existe'
+      });
+    }
+
+    const [
+      publicacion,
+      inquilino,
+      empresasSecretario,
+      resumenHistorial,
+      historialReservas,
+      ultimaEvaluacion
+    ] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerResumenUsuario(solicitudBase.inquilino_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId),
+      obtenerResumenHistorialInquilinoMysqlModel(solicitudBase.inquilino_id),
+      listarHistorialReservasInquilinoMysqlModel(
+        solicitudBase.inquilino_id,
+        reservaIdNumero
+      ),
+      obtenerUltimaEvaluacionInquilinoPorReservaMysqlModel(reservaIdNumero)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    if (!inquilino) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inquilino asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    if (solicitud.inquilino_id === gestorId) {
+    if (solicitudBase.inquilino_id === gestorId) {
       return res.status(403).json({
         mensaje: 'No puedes evaluar tu propia solicitud de reserva'
       });
     }
 
-    if (solicitud.estado_reserva !== 'SOLICITADA') {
+    if (solicitudBase.estado_reserva !== 'SOLICITADA') {
       return res.status(400).json({
         mensaje: 'Solo se puede registrar evaluación mientras la solicitud está en estado SOLICITADA',
-        estado_actual: solicitud.estado_reserva
+        estado_actual: solicitudBase.estado_reserva
       });
     }
-
-    const vetting = await obtenerVettingInquilinoReservaGestion(
-      usuarioPublicadorId,
-      reservaIdNumero
-    );
-
-    const resumenAutomatico = construirResumenVetting(vetting);
-
-    const advertenciasEvaluacion = construirAdvertenciasEvaluacion({
-      score_riesgo: scoreNumero,
-      resultado: resultadoNormalizado,
-      resumen_automatico: resumenAutomatico
-    });
-
-    const historialReservas = Number(
-      vetting?.resumen_historial?.total_solicitudes || 0
-    );
-
-    const ultimaEvaluacion = await obtenerUltimaEvaluacionInquilinoPorReserva(
-      reservaIdNumero
-    );
 
     const observacionUltima = limpiarTexto(ultimaEvaluacion?.observaciones);
 
@@ -1259,7 +1463,74 @@ const registrarEvaluacionInquilinoGestion = async (req, res) => {
       });
     }
 
-    let descripcionEvento = `Evaluación de vetting registrada. Resultado: ${resultadoNormalizado}. Score de riesgo: ${scoreNumero}. Historial del inquilino: ${historialReservas} solicitud(es).`;
+    const solicitud = {
+      ...solicitudBase,
+
+      codigo_inmueble: publicacion.codigo_inmueble || null,
+      nombre_inmueble: publicacion.nombre_inmueble || null,
+      tipo_inmueble: publicacion.tipo_inmueble || null,
+      subtipo_unidad: publicacion.subtipo_unidad || null,
+      direccion_linea1: publicacion.direccion_linea1 || null,
+      numero: publicacion.numero || null,
+      distrito: publicacion.distrito || null,
+      ciudad: publicacion.ciudad || null,
+      provincia: publicacion.provincia || null,
+      departamento: publicacion.departamento || null,
+
+      publicacion_id: publicacion.publicacion_id || null,
+      titulo_publicacion: publicacion.titulo_publicacion || null,
+      precio_publicado_mensual: publicacion.precio_publicado_mensual || null,
+      publicado_por_usuario_id: publicacion.publicado_por_usuario_id || null,
+
+      usuario_inquilino_id: inquilino.usuario_id,
+      correo_inquilino: inquilino.correo || null,
+      estado_usuario_inquilino: inquilino.estado || null,
+      email_verificado: inquilino.email_verificado || false,
+
+      perfil_usuario_id: inquilino.perfil_usuario_id || null,
+      nombres_inquilino: inquilino.nombres || null,
+      apellidos_inquilino: inquilino.apellidos || null,
+      tipo_documento: inquilino.tipo_documento || null,
+      numero_documento: inquilino.numero_documento || null,
+      telefono: inquilino.telefono || null,
+      fecha_nacimiento: inquilino.fecha_nacimiento || null,
+      sexo: inquilino.sexo || null,
+      foto_url: inquilino.foto_url || null,
+      biografia: inquilino.biografia || null,
+      direccion_inquilino: inquilino.direccion || null,
+      distrito_inquilino: inquilino.distrito || null,
+      ciudad_inquilino: inquilino.ciudad || null,
+      pais_inquilino: inquilino.pais || null,
+
+      ingreso_mensual_referencial:
+        inquilino.ingreso_mensual_referencial || null,
+      tiene_aval_bancario: inquilino.tiene_aval_bancario || false,
+      tiene_contrato_trabajo: inquilino.tiene_contrato_trabajo || false,
+      tiene_garante: inquilino.tiene_garante || false,
+      nombre_garante: inquilino.nombre_garante || null,
+      contacto_garante: inquilino.contacto_garante || null
+    };
+
+    const vetting = {
+      solicitud,
+      resumen_historial: resumenHistorial,
+      historial_reservas: historialReservas,
+      evaluacion_inquilino: ultimaEvaluacion
+    };
+
+    const resumenAutomatico = construirResumenVetting(vetting);
+
+    const advertenciasEvaluacion = construirAdvertenciasEvaluacion({
+      score_riesgo: scoreNumero,
+      resultado: resultadoNormalizado,
+      resumen_automatico: resumenAutomatico
+    });
+
+    const historialReservasTotal = Number(
+      resumenHistorial?.total_solicitudes || 0
+    );
+
+    let descripcionEvento = `Evaluación de vetting registrada. Resultado: ${resultadoNormalizado}. Score de riesgo: ${scoreNumero}. Historial del inquilino: ${historialReservasTotal} solicitud(es).`;
 
     if (observacionesLimpias) {
       descripcionEvento += ` Observación: ${observacionesLimpias}`;
@@ -1269,15 +1540,16 @@ const registrarEvaluacionInquilinoGestion = async (req, res) => {
       descripcionEvento = descripcionEvento.slice(0, 497) + '...';
     }
 
-    const { evaluacion, evento } = await registrarEvaluacionConEventoReservaGestion({
-      reserva_id: reservaIdNumero,
-      evaluado_por_usuario_id: gestorId,
-      score_riesgo: scoreNumero,
-      historial_reservas: historialReservas,
-      observaciones: observacionesLimpias || null,
-      resultado: resultadoNormalizado,
-      descripcion_evento: descripcionEvento
-    });
+    const { evaluacion, evento } =
+      await registrarEvaluacionConEventoReservaGestionMysqlModel({
+        reserva_id: reservaIdNumero,
+        evaluado_por_usuario_id: gestorId,
+        score_riesgo: scoreNumero,
+        historial_reservas: historialReservasTotal,
+        observaciones: observacionesLimpias || null,
+        resultado: resultadoNormalizado,
+        descripcion_evento: descripcionEvento
+      });
 
     return res.status(201).json({
       mensaje: 'Evaluación simplificada del inquilino registrada correctamente',
@@ -1310,32 +1582,58 @@ const obtenerEvaluacionesInquilinoGestion = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La solicitud de reserva no existe'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    const evaluaciones = await listarEvaluacionesInquilinoReservaGestion(
-      usuarioPublicadorId,
-      reservaIdNumero
-    );
+    const evaluaciones =
+      await listarEvaluacionesInquilinoReservaGestionMysqlModel(
+        reservaIdNumero
+      );
 
     return res.json({
       mensaje: 'Evaluaciones del inquilino obtenidas correctamente',
       reserva: {
-        reserva_id: solicitud.reserva_id,
-        estado_reserva: solicitud.estado_reserva,
-        inquilino_id: solicitud.inquilino_id,
-        inmueble_id: solicitud.inmueble_id,
-        codigo_inmueble: solicitud.codigo_inmueble,
-        nombre_inmueble: solicitud.nombre_inmueble,
-        tipo_inmueble: solicitud.tipo_inmueble
+        reserva_id: solicitudBase.reserva_id,
+        estado_reserva: solicitudBase.estado_reserva,
+        inquilino_id: solicitudBase.inquilino_id,
+        inmueble_id: solicitudBase.inmueble_id,
+        codigo_inmueble: publicacion.codigo_inmueble || null,
+        nombre_inmueble: publicacion.nombre_inmueble || null,
+        tipo_inmueble: publicacion.tipo_inmueble || null
       },
       total: evaluaciones.length,
       evaluaciones

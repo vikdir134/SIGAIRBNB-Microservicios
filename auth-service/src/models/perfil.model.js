@@ -193,10 +193,20 @@ const obtenerResumenUsuarioPorId = async (usuario_id) => {
         p.telefono,
         p.tipo_documento,
         p.numero_documento,
+        p.fecha_nacimiento,
+        p.sexo,
+        p.foto_url,
+        p.biografia,
+        p.direccion,
+        p.distrito,
+        p.ciudad,
+        p.pais,
         p.ingreso_mensual_referencial,
         p.tiene_aval_bancario,
         p.tiene_contrato_trabajo,
-        p.tiene_garante
+        p.tiene_garante,
+        p.nombre_garante,
+        p.contacto_garante
       FROM auth.Usuario u
       LEFT JOIN core.PerfilUsuario p
         ON p.usuario_id = u.usuario_id
