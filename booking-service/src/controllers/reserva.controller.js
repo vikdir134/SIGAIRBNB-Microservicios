@@ -56,7 +56,9 @@ const {
   crearSolicitudExtensionReservaMysqlModel,
   obtenerSolicitudExtensionGestionPorIdMysqlModel,
   aprobarSolicitudExtensionReservaGestionMysqlModel,
-  rechazarSolicitudExtensionReservaGestionMysqlModel
+  rechazarSolicitudExtensionReservaGestionMysqlModel,
+  obtenerReservaParaCancelacionInquilinoMysqlModel,
+  cancelarReservaPorInquilinoMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
@@ -2528,7 +2530,6 @@ const rechazarSolicitudExtension = async (
 
 const cancelarReservaInquilino = async (req, res) => {
   try {
-    const empresa_id = req.usuario.empresa_id;
     const usuario_id = req.usuario.usuario_id;
 
     const reserva_id = Number(
@@ -2543,7 +2544,15 @@ const cancelarReservaInquilino = async (req, res) => {
       });
     }
 
-    const reserva = await obtenerReservaParaCancelacionInquilino(
+    const motivoLimpio = limpiarTexto(motivo);
+
+    if (motivoLimpio.length > 500) {
+      return res.status(400).json({
+        mensaje: 'El motivo de cancelación no puede superar los 500 caracteres'
+      });
+    }
+
+    const reserva = await obtenerReservaParaCancelacionInquilinoMysqlModel(
       reserva_id,
       usuario_id
     );
@@ -2564,53 +2573,37 @@ const cancelarReservaInquilino = async (req, res) => {
       });
     }
 
-    const estadoFinanciero = await obtenerEstadoFinancieroReserva(
-      reserva_id
+    const publicacion = await obtenerPublicacionPorInmueble(
+      reserva.inmueble_id
     );
 
-    if (
-      estadoFinanciero &&
-      Number(estadoFinanciero.tiene_pago_confirmado) === 1
-    ) {
-      return res.status(409).json({
-        codigo: 'RESERVA_CON_RECIBO_PAGADO',
-        mensaje:
-          'La reserva ya tiene una boleta pagada. No puede cancelarse directamente. Debe solicitar revisión al administrador.',
-        recibo: {
-          recibo_id: estadoFinanciero.recibo_id,
-          estado_recibo: estadoFinanciero.estado_recibo,
-          total: estadoFinanciero.total,
-          saldo_pendiente: estadoFinanciero.saldo_pendiente
-        }
-      });
-    }
-
-    const reservaCancelada = await cancelarReservaPorInquilino({
+    const resultado = await cancelarReservaPorInquilinoMysqlModel({
       reserva_id,
       usuario_id,
-      motivo: motivo?.trim() || null
+      motivo: motivoLimpio || null
     });
 
-    let notificacionCreada = null;
-
-    if (reserva.anfitrion_usuario_id) {
-      notificacionCreada = await crearNotificacion({
-        empresa_id,
-        usuario_origen_id: usuario_id,
-        usuario_destino_id: reserva.anfitrion_usuario_id,
-        tipo_notificacion: 'RESERVA_CANCELADA_INQUILINO',
-        titulo: 'Reserva cancelada',
-        mensaje: `El inquilino canceló la reserva del inmueble ${reserva.nombre_inmueble || reserva.codigo_inmueble || ''}.`,
-        referencia_tipo: 'RESERVA',
-        referencia_id: reserva_id
+    if (!resultado) {
+      return res.status(409).json({
+        mensaje:
+          'No se pudo cancelar la reserva. Verifica que siga en estado SOLICITADA o APROBADA'
       });
     }
 
     return res.status(200).json({
       mensaje: 'Reserva cancelada correctamente',
-      reserva: reservaCancelada,
-      notificacion: notificacionCreada
+      reserva: {
+        ...resultado.reserva,
+
+        codigo_inmueble: publicacion?.codigo_inmueble || null,
+        nombre_inmueble: publicacion?.nombre_inmueble || null,
+        tipo_inmueble: publicacion?.tipo_inmueble || null,
+        publicacion_id: publicacion?.publicacion_id || null,
+        titulo_publicacion: publicacion?.titulo_publicacion || null
+      },
+      evento: resultado.evento
     });
+
   } catch (error) {
     console.error('Error al cancelar reserva:', error);
 

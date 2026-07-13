@@ -1595,6 +1595,177 @@ const rechazarSolicitudExtensionReservaGestionMysqlModel = async ({
   }
 };
 
+const obtenerReservaParaCancelacionInquilinoMysqlModel = async (
+  reserva_id,
+  usuario_id
+) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      reserva_id,
+      inmueble_id,
+      inquilino_id,
+      estado_reserva,
+      fecha_solicitud,
+      fecha_inicio,
+      fecha_fin,
+      renta_pactada_mensual,
+      monto_total_estimado,
+      deposito_garantia,
+      moneda,
+      observacion_inquilino,
+      observacion_gestor,
+      motivo_rechazo,
+      motivo_cancelacion,
+      fecha_decision,
+      gestionado_por_usuario_id,
+      fecha_checkin,
+      fecha_checkout,
+      checkin_confirmado_por,
+      checkout_confirmado_por,
+      cancelado_por_usuario_id,
+      fecha_cancelacion,
+      created_at,
+      updated_at
+    FROM reserva
+    WHERE reserva_id = ?
+      AND inquilino_id = ?;
+  `;
+
+  const [rows] = await pool.execute(query, [
+    reserva_id,
+    usuario_id
+  ]);
+
+  return rows[0] || null;
+};
+
+const cancelarReservaPorInquilinoMysqlModel = async ({
+  reserva_id,
+  usuario_id,
+  motivo
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [updateResult] = await connection.execute(
+      `
+      UPDATE reserva
+      SET
+        estado_reserva = 'CANCELADA',
+        motivo_cancelacion = ?,
+        cancelado_por_usuario_id = ?,
+        fecha_cancelacion = NOW(),
+        updated_at = NOW()
+      WHERE reserva_id = ?
+        AND inquilino_id = ?
+        AND estado_reserva IN ('SOLICITADA', 'APROBADA');
+      `,
+      [
+        motivo,
+        usuario_id,
+        reserva_id,
+        usuario_id
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return null;
+    }
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        deposito_garantia,
+        moneda,
+        observacion_inquilino,
+        observacion_gestor,
+        motivo_rechazo,
+        motivo_cancelacion,
+        fecha_decision,
+        gestionado_por_usuario_id,
+        fecha_checkin,
+        fecha_checkout,
+        checkin_confirmado_por,
+        checkout_confirmado_por,
+        cancelado_por_usuario_id,
+        fecha_cancelacion,
+        created_at,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [reserva_id]
+    );
+
+    const descripcionEvento = motivo
+      ? `Reserva cancelada por el inquilino. Motivo: ${motivo}`
+      : 'Reserva cancelada por el inquilino.';
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'CANCELACION_INQUILINO', ?, NOW());
+      `,
+      [
+        reserva_id,
+        usuario_id,
+        descripcionEvento.length > 500
+          ? descripcionEvento.slice(0, 497) + '...'
+          : descripcionEvento
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
@@ -1620,5 +1791,7 @@ module.exports = {
   crearSolicitudExtensionReservaMysqlModel,
   obtenerSolicitudExtensionGestionPorIdMysqlModel,
   aprobarSolicitudExtensionReservaGestionMysqlModel,
-  rechazarSolicitudExtensionReservaGestionMysqlModel
+  rechazarSolicitudExtensionReservaGestionMysqlModel,
+  obtenerReservaParaCancelacionInquilinoMysqlModel,
+  cancelarReservaPorInquilinoMysqlModel
 };
