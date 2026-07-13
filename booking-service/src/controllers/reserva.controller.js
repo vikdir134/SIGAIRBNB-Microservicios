@@ -1,7 +1,6 @@
 //reservaController
 
 const {
-  obtenerPublicacionReservablePorId,
   buscarConflictosReserva,
   crearSolicitudReserva,
   listarSolicitudesPorInquilino,
@@ -58,11 +57,14 @@ const {
   aprobarSolicitudExtensionReservaGestionMysqlModel,
   rechazarSolicitudExtensionReservaGestionMysqlModel,
   obtenerReservaParaCancelacionInquilinoMysqlModel,
-  cancelarReservaPorInquilinoMysqlModel
+  cancelarReservaPorInquilinoMysqlModel,
+  buscarConflictosReservaMysqlModel,
+  crearSolicitudReservaMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
-  obtenerPublicacionPorInmueble
+  obtenerPublicacionPorInmueble,
+  obtenerPublicacionReservablePorId
 } = require('../clients/catalog.client');
 
 const {
@@ -398,7 +400,7 @@ const solicitarReserva = async (req, res) => {
       fecha_inicio,
       fecha_fin,
       observacion_inquilino
-    } = req.body;
+    } = req.body || {};
 
     const publicacionIdNumero = Number(publicacion_id);
 
@@ -420,13 +422,13 @@ const solicitarReserva = async (req, res) => {
       });
     }
 
-   const erroresRangoReserva = validateDateRange({
-  start: fecha_inicio,
-  end: fecha_fin,
-  allowPast: false,
-  maxDays: MAX_RESERVA_DAYS,
-  maxFutureYears: MAX_RESERVA_FUTURE_YEARS
-});
+    const erroresRangoReserva = validateDateRange({
+      start: fecha_inicio,
+      end: fecha_fin,
+      allowPast: false,
+      maxDays: MAX_RESERVA_DAYS,
+      maxFutureYears: MAX_RESERVA_FUTURE_YEARS
+    });
 
     if (erroresRangoReserva.length > 0) {
       return res.status(400).json({
@@ -443,7 +445,9 @@ const solicitarReserva = async (req, res) => {
       });
     }
 
-    const publicacion = await obtenerPublicacionReservablePorId(publicacionIdNumero);
+    const publicacion = await obtenerPublicacionReservablePorId(
+      publicacionIdNumero
+    );
 
     if (!publicacion) {
       return res.status(404).json({
@@ -453,7 +457,7 @@ const solicitarReserva = async (req, res) => {
 
     if (
       publicacion.disponible_desde &&
-      fecha_inicio < publicacion.disponible_desde.toISOString().slice(0, 10)
+      fecha_inicio < convertirFechaAYYYYMMDD(publicacion.disponible_desde)
     ) {
       return res.status(400).json({
         mensaje: 'El inmueble aún no está disponible desde la fecha seleccionada',
@@ -461,28 +465,26 @@ const solicitarReserva = async (req, res) => {
       });
     }
 
-    const conflictos = await buscarConflictosReserva({
-      empresa_id: publicacion.empresa_id,
+    const reservasConflictivas = await buscarConflictosReservaMysqlModel({
       inmueble_id: publicacion.inmueble_id,
       fecha_inicio,
       fecha_fin
     });
 
-    if (conflictos.bloqueos.length > 0 || conflictos.reservas.length > 0) {
+    if (reservasConflictivas.length > 0) {
       return res.status(409).json({
         mensaje: 'No se puede solicitar la reserva porque el inmueble no está disponible en ese rango de fechas',
-        bloqueos_solapados: conflictos.bloqueos,
-        reservas_solapadas: conflictos.reservas
+        reservas_solapadas: reservasConflictivas
       });
     }
 
-    const reservaCreada = await crearSolicitudReserva({
+    const resultado = await crearSolicitudReservaMysqlModel({
       inmueble_id: publicacion.inmueble_id,
       inquilino_id: inquilinoId,
       fecha_inicio,
       fecha_fin,
       renta_pactada_mensual: publicacion.precio_publicado_mensual,
-      moneda: publicacion.moneda,
+      moneda: publicacion.moneda || 'PEN',
       observacion_inquilino: observacionLimpia || null
     });
 
@@ -496,7 +498,8 @@ const solicitarReserva = async (req, res) => {
         nombre_inmueble: publicacion.nombre_inmueble,
         tipo_inmueble: publicacion.tipo_inmueble
       },
-      reserva: reservaCreada
+      reserva: resultado.reserva,
+      evento: resultado.evento
     });
 
   } catch (error) {

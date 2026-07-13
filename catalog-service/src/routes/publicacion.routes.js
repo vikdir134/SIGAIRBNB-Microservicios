@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const validateGatewayRequest = require('../middlewares/validateGatewayRequest');
+
 const {
   listarPublicacionesPublicas,
   obtenerDetallePublicacion,
@@ -10,7 +12,8 @@ const {
   publicarPublicacionGestion,
   eliminarBorradorPublicacionGestion,
   eliminarPublicacionGestion,
-  obtenerPublicacionPorInmuebleInterno
+  obtenerPublicacionPorInmuebleInterno,
+  obtenerPublicacionReservableInterno
 } = require('../controllers/publicacion.controller');
 
 const {
@@ -71,6 +74,12 @@ router.delete(
 router.get(
   '/internal/inmuebles/:inmueble_id',
   obtenerPublicacionPorInmuebleInterno
+);
+
+router.get(
+  '/internal/:publicacion_id/reservable',
+  validateGatewayRequest,
+  obtenerPublicacionReservableInterno
 );
 
 /*

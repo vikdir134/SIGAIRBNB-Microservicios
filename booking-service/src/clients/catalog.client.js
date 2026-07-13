@@ -29,6 +29,27 @@ const obtenerPublicacionPorInmueble = async (inmueble_id) => {
   }
 };
 
+const obtenerPublicacionReservablePorId = async (publicacion_id) => {
+  try {
+    const response = await axios.get(
+      `${CATALOG_SERVICE_URL}/api/publicaciones/internal/${publicacion_id}/reservable`,
+      {
+        headers: { 'x-gateway-secret': GATEWAY_SECRET },
+        timeout: 8000
+      }
+    );
+
+    return response.data.publicacion || null;
+  } catch (error) {
+    console.error(
+      `Error obteniendo publicación reservable ${publicacion_id}:`,
+      error.message
+    );
+    return null;
+  }
+};
+
 module.exports = {
-  obtenerPublicacionPorInmueble
+  obtenerPublicacionPorInmueble,
+  obtenerPublicacionReservablePorId
 };

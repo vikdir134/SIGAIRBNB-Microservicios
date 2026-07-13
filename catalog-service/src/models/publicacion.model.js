@@ -767,6 +767,41 @@ const obtenerResumenPublicacionPorInmueble = async (inmueble_id) => {
   return result.recordset[0] || null;
 };
 
+const obtenerPublicacionReservablePorIdInterno = async (publicacion_id) => {
+  const pool = await getConnection();
+
+  const result = await pool.request()
+    .input('publicacion_id', sql.Int, publicacion_id)
+    .query(`
+      SELECT
+        p.publicacion_id,
+        p.inmueble_id,
+        p.titulo,
+        p.descripcion_corta,
+        p.precio_publicado_mensual,
+        p.disponible_desde,
+        p.acepta_reservas,
+        p.estado_publicacion,
+
+        i.empresa_id,
+        i.codigo AS codigo_inmueble,
+        i.nombre AS nombre_inmueble,
+        i.tipo_inmueble,
+
+        'PEN' AS moneda
+      FROM catalog.Publicacion p
+      INNER JOIN catalog.Inmueble i
+        ON i.inmueble_id = p.inmueble_id
+      WHERE p.publicacion_id = @publicacion_id
+        AND p.acepta_reservas = 1
+        AND p.estado_publicacion = 'PUBLICADA'
+        AND i.activo = 1
+        AND i.deleted_at IS NULL;
+    `);
+
+  return result.recordset[0] || null;
+};
+
 module.exports = {
   listarPublicaciones,
   obtenerPublicacionPorId,
@@ -781,5 +816,6 @@ module.exports = {
   publicarPublicacionPorId,
   eliminarBorradorPublicacionPorId,
   eliminarPublicacionPorId,
-  obtenerResumenPublicacionPorInmueble
+  obtenerResumenPublicacionPorInmueble,
+  obtenerPublicacionReservablePorIdInterno
 };

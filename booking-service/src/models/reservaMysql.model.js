@@ -1766,6 +1766,155 @@ const cancelarReservaPorInquilinoMysqlModel = async ({
   }
 };
 
+const buscarConflictosReservaMysqlModel = async ({
+  inmueble_id,
+  fecha_inicio,
+  fecha_fin
+}) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      reserva_id,
+      inmueble_id,
+      inquilino_id,
+      estado_reserva,
+      fecha_inicio,
+      fecha_fin
+    FROM reserva
+    WHERE inmueble_id = ?
+      AND estado_reserva IN ('SOLICITADA', 'APROBADA', 'ACTIVA')
+      AND (
+        ? <= fecha_fin
+        AND ? >= fecha_inicio
+      )
+    ORDER BY fecha_inicio ASC;
+  `;
+
+  const [rows] = await pool.execute(query, [
+    inmueble_id,
+    fecha_inicio,
+    fecha_fin
+  ]);
+
+  return rows;
+};
+
+const crearSolicitudReservaMysqlModel = async ({
+  inmueble_id,
+  inquilino_id,
+  fecha_inicio,
+  fecha_fin,
+  renta_pactada_mensual,
+  moneda,
+  observacion_inquilino
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [reservaResult] = await connection.execute(
+      `
+      INSERT INTO reserva (
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        moneda,
+        observacion_inquilino,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, 'SOLICITADA', NOW(), ?, ?, ?, ?, ?, NOW(), NOW());
+      `,
+      [
+        inmueble_id,
+        inquilino_id,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        moneda || 'PEN',
+        observacion_inquilino
+      ]
+    );
+
+    const reservaId = reservaResult.insertId;
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        deposito_garantia,
+        moneda,
+        observacion_inquilino,
+        created_at,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [reservaId]
+    );
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'SOLICITUD', 'Solicitud de reserva registrada.', NOW());
+      `,
+      [
+        reservaId,
+        inquilino_id
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
@@ -1793,5 +1942,7 @@ module.exports = {
   aprobarSolicitudExtensionReservaGestionMysqlModel,
   rechazarSolicitudExtensionReservaGestionMysqlModel,
   obtenerReservaParaCancelacionInquilinoMysqlModel,
-  cancelarReservaPorInquilinoMysqlModel
+  cancelarReservaPorInquilinoMysqlModel,
+  buscarConflictosReservaMysqlModel,
+  crearSolicitudReservaMysqlModel
 };

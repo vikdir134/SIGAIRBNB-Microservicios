@@ -12,7 +12,8 @@ const {
   publicarPublicacionPorId,
   eliminarBorradorPublicacionPorId,
   eliminarPublicacionPorId,
-  obtenerResumenPublicacionPorInmueble
+  obtenerResumenPublicacionPorInmueble,
+  obtenerPublicacionReservablePorIdInterno
 } = require('../models/publicacion.model');
 
 const {
@@ -741,6 +742,42 @@ const obtenerPublicacionPorInmuebleInterno = async (req, res) => {
   }
 };
 
+const obtenerPublicacionReservableInterno = async (req, res) => {
+  try {
+    const { publicacion_id } = req.params;
+    const publicacionIdNumero = Number(publicacion_id);
+
+    if (Number.isNaN(publicacionIdNumero) || publicacionIdNumero <= 0) {
+      return res.status(400).json({
+        mensaje: 'El ID de la publicación no es válido'
+      });
+    }
+
+    const publicacion = await obtenerPublicacionReservablePorIdInterno(
+      publicacionIdNumero
+    );
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'La publicación no existe, no está publicada o no acepta reservas'
+      });
+    }
+
+    return res.json({
+      mensaje: 'Publicación reservable obtenida correctamente',
+      publicacion
+    });
+
+  } catch (error) {
+    console.error('Error al obtener publicación reservable interna:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al obtener publicación reservable',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   listarPublicacionesPublicas,
   obtenerDetallePublicacion,
@@ -750,5 +787,6 @@ module.exports = {
   publicarPublicacionGestion,
   eliminarBorradorPublicacionGestion,
   eliminarPublicacionGestion,
-  obtenerPublicacionPorInmuebleInterno
+  obtenerPublicacionPorInmuebleInterno,
+  obtenerPublicacionReservableInterno
 };
