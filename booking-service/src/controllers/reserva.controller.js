@@ -1852,6 +1852,7 @@ const rechazarSolicitudExtension = async (
     });
   }
 };
+
 const cancelarReservaInquilino = async (req, res) => {
   try {
     const empresa_id = req.usuario.empresa_id;
@@ -1947,6 +1948,10 @@ const cancelarReservaInquilino = async (req, res) => {
   }
 };
 
+const {
+  listarReservasPorRangoInternoMysqlModel
+} = require('../models/reservaMysql.model');
+
 const listarReservasPorRangoInterno = async (req, res) => {
   try {
     const {
@@ -1975,7 +1980,7 @@ const listarReservasPorRangoInterno = async (req, res) => {
           .map((estado) => estado.trim().toUpperCase())
       : ['SOLICITADA', 'APROBADA', 'ACTIVA'];
 
-    const reservas = await listarReservasPorRangoInternoModel({
+    const reservas = await listarReservasPorRangoInternoMysqlModel({
       inmueble_id: inmuebleIdNumero,
       fecha_inicio,
       fecha_fin,
