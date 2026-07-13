@@ -1,36 +1,6 @@
 //reservaController
 
 const {
-  buscarConflictosReserva,
-  crearSolicitudReserva,
-  listarSolicitudesPorInquilino,
-  listarSolicitudesGestionEmpresa,
-  obtenerSolicitudGestionPorId,
-  buscarConflictosAprobacionReserva,
-  aprobarSolicitudReservaPorId,
-  rechazarSolicitudReservaPorId,
-  listarEventosReservaGestion,
-  obtenerSolicitudInquilinoPorId,
-  listarEventosReservaInquilino,
-  obtenerVettingInquilinoReservaGestion,
-  obtenerUltimaEvaluacionInquilinoPorReserva,
-  listarEvaluacionesInquilinoReservaGestion,
-  registrarEvaluacionConEventoReservaGestion,
-  confirmarCheckinReservaGestion,
-  confirmarCheckoutReservaGestion,
-  obtenerReservaExtensibleInquilinoPorId,
-  obtenerSolicitudExtensionPendientePorReserva,
-  buscarConflictosExtensionReserva,
-  crearSolicitudExtensionReserva,
-  obtenerExtensionPendienteReservaGestion,
-  aprobarSolicitudExtensionReservaGestion,
-  rechazarSolicitudExtensionReservaGestion,
-  obtenerReservaParaCancelacionInquilino,
-  cancelarReservaPorInquilino,
-  obtenerEstadoFinancieroReserva
-} = require('../models/reserva.model');
-
-const {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
   listarSolicitudesGestionEmpresaMysqlModel,
@@ -66,10 +36,6 @@ const {
   obtenerPublicacionPorInmueble,
   obtenerPublicacionReservablePorId
 } = require('../clients/catalog.client');
-
-const {
-  crearNotificacion
-} = require('../models/notificacion.model');
 
 const {
   obtenerResumenUsuario,
