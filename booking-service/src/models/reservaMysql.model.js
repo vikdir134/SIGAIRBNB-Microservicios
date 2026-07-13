@@ -577,6 +577,497 @@ const registrarEvaluacionConEventoReservaGestionMysqlModel = async ({
   }
 };
 
+const buscarConflictosAprobacionReservaMysqlModel = async ({
+  inmueble_id,
+  reserva_id,
+  fecha_inicio,
+  fecha_fin
+}) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      reserva_id,
+      inmueble_id,
+      inquilino_id,
+      estado_reserva,
+      fecha_inicio,
+      fecha_fin
+    FROM reserva
+    WHERE inmueble_id = ?
+      AND reserva_id <> ?
+      AND estado_reserva IN ('APROBADA', 'ACTIVA')
+      AND (
+        ? <= fecha_fin
+        AND ? >= fecha_inicio
+      )
+    ORDER BY fecha_inicio ASC;
+  `;
+
+  const [rows] = await pool.execute(query, [
+    inmueble_id,
+    reserva_id,
+    fecha_inicio,
+    fecha_fin
+  ]);
+
+  return rows;
+};
+
+const aprobarSolicitudReservaPorIdMysqlModel = async ({
+  reserva_id,
+  gestor_id,
+  observacion_gestor
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [updateResult] = await connection.execute(
+      `
+      UPDATE reserva
+      SET
+        estado_reserva = 'APROBADA',
+        observacion_gestor = ?,
+        fecha_decision = NOW(),
+        gestionado_por_usuario_id = ?,
+        updated_at = NOW()
+      WHERE reserva_id = ?
+        AND estado_reserva = 'SOLICITADA';
+      `,
+      [
+        observacion_gestor,
+        gestor_id,
+        reserva_id
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return null;
+    }
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        deposito_garantia,
+        moneda,
+        observacion_inquilino,
+        observacion_gestor,
+        fecha_decision,
+        gestionado_por_usuario_id,
+        created_at,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [reserva_id]
+    );
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'APROBACION', ?, NOW());
+      `,
+      [
+        reserva_id,
+        gestor_id,
+        observacion_gestor
+          ? `Solicitud aprobada. Observación: ${observacion_gestor}`
+          : 'Solicitud aprobada.'
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+const rechazarSolicitudReservaPorIdMysqlModel = async ({
+  reserva_id,
+  gestor_id,
+  motivo_rechazo,
+  observacion_gestor
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [updateResult] = await connection.execute(
+      `
+      UPDATE reserva
+      SET
+        estado_reserva = 'RECHAZADA',
+        motivo_rechazo = ?,
+        observacion_gestor = ?,
+        fecha_decision = NOW(),
+        gestionado_por_usuario_id = ?,
+        updated_at = NOW()
+      WHERE reserva_id = ?
+        AND estado_reserva = 'SOLICITADA';
+      `,
+      [
+        motivo_rechazo,
+        observacion_gestor,
+        gestor_id,
+        reserva_id
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return null;
+    }
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        deposito_garantia,
+        moneda,
+        observacion_inquilino,
+        observacion_gestor,
+        motivo_rechazo,
+        fecha_decision,
+        gestionado_por_usuario_id,
+        created_at,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [reserva_id]
+    );
+
+    const descripcionEvento = observacion_gestor
+      ? `Solicitud rechazada. Motivo: ${motivo_rechazo}. Observación: ${observacion_gestor}`
+      : `Solicitud rechazada. Motivo: ${motivo_rechazo}`;
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'RECHAZO', ?, NOW());
+      `,
+      [
+        reserva_id,
+        gestor_id,
+        descripcionEvento.length > 500
+          ? descripcionEvento.slice(0, 497) + '...'
+          : descripcionEvento
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+const confirmarCheckinReservaGestionMysqlModel = async ({
+  reserva_id,
+  gestor_id
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [updateResult] = await connection.execute(
+      `
+      UPDATE reserva
+      SET
+        estado_reserva = 'ACTIVA',
+        fecha_checkin = NOW(),
+        checkin_confirmado_por = ?,
+        updated_at = NOW()
+      WHERE reserva_id = ?
+        AND estado_reserva = 'APROBADA'
+        AND fecha_checkin IS NULL;
+      `,
+      [
+        gestor_id,
+        reserva_id
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return null;
+    }
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        deposito_garantia,
+        moneda,
+        observacion_inquilino,
+        observacion_gestor,
+        motivo_rechazo,
+        motivo_cancelacion,
+        fecha_decision,
+        gestionado_por_usuario_id,
+        fecha_checkin,
+        fecha_checkout,
+        checkin_confirmado_por,
+        checkout_confirmado_por,
+        created_at,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [reserva_id]
+    );
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'CHECKIN', 'Check-in confirmado por el gestor.', NOW());
+      `,
+      [
+        reserva_id,
+        gestor_id
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+const confirmarCheckoutReservaGestionMysqlModel = async ({
+  reserva_id,
+  gestor_id
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [updateResult] = await connection.execute(
+      `
+      UPDATE reserva
+      SET
+        estado_reserva = 'FINALIZADA',
+        fecha_checkout = NOW(),
+        checkout_confirmado_por = ?,
+        updated_at = NOW()
+      WHERE reserva_id = ?
+        AND estado_reserva = 'ACTIVA'
+        AND fecha_checkout IS NULL;
+      `,
+      [
+        gestor_id,
+        reserva_id
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return null;
+    }
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_solicitud,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        deposito_garantia,
+        moneda,
+        observacion_inquilino,
+        observacion_gestor,
+        motivo_rechazo,
+        motivo_cancelacion,
+        fecha_decision,
+        gestionado_por_usuario_id,
+        fecha_checkin,
+        fecha_checkout,
+        checkin_confirmado_por,
+        checkout_confirmado_por,
+        created_at,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [reserva_id]
+    );
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'CHECKOUT', 'Check-out confirmado por el gestor.', NOW());
+      `,
+      [
+        reserva_id,
+        gestor_id
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
@@ -591,5 +1082,10 @@ module.exports = {
   obtenerUltimaEvaluacionInquilinoPorReservaMysqlModel,
   obtenerResumenHistorialInquilinoMysqlModel,
   listarHistorialReservasInquilinoMysqlModel,
-  registrarEvaluacionConEventoReservaGestionMysqlModel
+  registrarEvaluacionConEventoReservaGestionMysqlModel,
+  buscarConflictosAprobacionReservaMysqlModel,
+  aprobarSolicitudReservaPorIdMysqlModel,
+  rechazarSolicitudReservaPorIdMysqlModel,
+  confirmarCheckinReservaGestionMysqlModel,
+  confirmarCheckoutReservaGestionMysqlModel
 };

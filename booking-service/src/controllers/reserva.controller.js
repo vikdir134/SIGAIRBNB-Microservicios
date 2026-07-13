@@ -45,7 +45,12 @@ const {
   obtenerUltimaEvaluacionInquilinoPorReservaMysqlModel,
   obtenerResumenHistorialInquilinoMysqlModel,
   listarHistorialReservasInquilinoMysqlModel,
-  registrarEvaluacionConEventoReservaGestionMysqlModel
+  registrarEvaluacionConEventoReservaGestionMysqlModel,
+  buscarConflictosAprobacionReservaMysqlModel,
+  aprobarSolicitudReservaPorIdMysqlModel,
+  rechazarSolicitudReservaPorIdMysqlModel,
+  confirmarCheckinReservaGestionMysqlModel,
+  confirmarCheckoutReservaGestionMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
@@ -705,6 +710,7 @@ const obtenerSolicitudesGestion = async (req, res) => {
     });
   }
 };
+
 const aprobarSolicitudReserva = async (req, res) => {
   try {
     const usuarioPublicadorId = req.usuario.usuario_id;
@@ -729,33 +735,60 @@ const aprobarSolicitudReserva = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La solicitud de reserva no existe'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    if (solicitud.inquilino_id === gestorId) {
-        return res.status(403).json({
+    if (solicitudBase.inquilino_id === gestorId) {
+      return res.status(403).json({
         mensaje: 'No puedes aprobar tu propia solicitud de reserva'
-        });
-    }
-
-    if (solicitud.estado_reserva !== 'SOLICITADA') {
-      return res.status(400).json({
-        mensaje: 'Solo se pueden aprobar solicitudes en estado SOLICITADA',
-        estado_actual: solicitud.estado_reserva
       });
     }
 
-    const ultimaEvaluacion = await obtenerUltimaEvaluacionInquilinoPorReserva(
-      reservaIdNumero
-    );
+    if (solicitudBase.estado_reserva !== 'SOLICITADA') {
+      return res.status(400).json({
+        mensaje: 'Solo se pueden aprobar solicitudes en estado SOLICITADA',
+        estado_actual: solicitudBase.estado_reserva
+      });
+    }
+
+    const ultimaEvaluacion =
+      await obtenerUltimaEvaluacionInquilinoPorReservaMysqlModel(
+        reservaIdNumero
+      );
 
     if (!ultimaEvaluacion) {
       return res.status(409).json({
@@ -773,12 +806,11 @@ const aprobarSolicitudReserva = async (req, res) => {
       });
     }
 
-    const conflictos = await buscarConflictosAprobacionReserva({
-      empresa_id: solicitud.empresa_id,
-      inmueble_id: solicitud.inmueble_id,
-      reserva_id: solicitud.reserva_id,
-      fecha_inicio: solicitud.fecha_inicio,
-      fecha_fin: solicitud.fecha_fin
+    const conflictos = await buscarConflictosAprobacionReservaMysqlModel({
+      inmueble_id: solicitudBase.inmueble_id,
+      reserva_id: solicitudBase.reserva_id,
+      fecha_inicio: solicitudBase.fecha_inicio,
+      fecha_fin: solicitudBase.fecha_fin
     });
 
     if (conflictos.length > 0) {
@@ -788,14 +820,13 @@ const aprobarSolicitudReserva = async (req, res) => {
       });
     }
 
-    const reservaAprobada = await aprobarSolicitudReservaPorId({
-      usuario_publicador_id: usuarioPublicadorId,
+    const resultado = await aprobarSolicitudReservaPorIdMysqlModel({
       reserva_id: reservaIdNumero,
       gestor_id: gestorId,
       observacion_gestor: observacionLimpia || null
     });
 
-    if (!reservaAprobada) {
+    if (!resultado) {
       return res.status(400).json({
         mensaje: 'No se pudo aprobar la solicitud. Verifica que siga en estado SOLICITADA'
       });
@@ -803,7 +834,16 @@ const aprobarSolicitudReserva = async (req, res) => {
 
     return res.json({
       mensaje: 'Solicitud de reserva aprobada correctamente',
-      reserva: reservaAprobada
+      reserva: {
+        ...resultado.reserva,
+
+        codigo_inmueble: publicacion.codigo_inmueble || null,
+        nombre_inmueble: publicacion.nombre_inmueble || null,
+        tipo_inmueble: publicacion.tipo_inmueble || null,
+        publicacion_id: publicacion.publicacion_id || null,
+        titulo_publicacion: publicacion.titulo_publicacion || null
+      },
+      evento: resultado.evento
     });
 
   } catch (error) {
@@ -853,39 +893,64 @@ const rechazarSolicitudReserva = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La solicitud de reserva no existe'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La solicitud de reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    if (solicitud.inquilino_id === gestorId) {
+    if (solicitudBase.inquilino_id === gestorId) {
       return res.status(403).json({
         mensaje: 'No puedes rechazar tu propia solicitud de reserva'
       });
     }
 
-    if (solicitud.estado_reserva !== 'SOLICITADA') {
+    if (solicitudBase.estado_reserva !== 'SOLICITADA') {
       return res.status(400).json({
         mensaje: 'Solo se pueden rechazar solicitudes en estado SOLICITADA',
-        estado_actual: solicitud.estado_reserva
+        estado_actual: solicitudBase.estado_reserva
       });
     }
 
-    const reservaRechazada = await rechazarSolicitudReservaPorId({
-      usuario_publicador_id: usuarioPublicadorId,
+    const resultado = await rechazarSolicitudReservaPorIdMysqlModel({
       reserva_id: reservaIdNumero,
       gestor_id: gestorId,
       motivo_rechazo: motivoLimpio,
       observacion_gestor: observacionLimpia || null
     });
 
-    if (!reservaRechazada) {
+    if (!resultado) {
       return res.status(400).json({
         mensaje: 'No se pudo rechazar la solicitud. Verifica que siga en estado SOLICITADA'
       });
@@ -893,7 +958,16 @@ const rechazarSolicitudReserva = async (req, res) => {
 
     return res.json({
       mensaje: 'Solicitud de reserva rechazada correctamente',
-      reserva: reservaRechazada
+      reserva: {
+        ...resultado.reserva,
+
+        codigo_inmueble: publicacion.codigo_inmueble || null,
+        nombre_inmueble: publicacion.nombre_inmueble || null,
+        tipo_inmueble: publicacion.tipo_inmueble || null,
+        publicacion_id: publicacion.publicacion_id || null,
+        titulo_publicacion: publicacion.titulo_publicacion || null
+      },
+      evento: resultado.evento
     });
 
   } catch (error) {
@@ -1754,32 +1828,57 @@ const confirmarCheckinReserva = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La reserva no existe'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    if (solicitud.inquilino_id === gestorId) {
+    if (solicitudBase.inquilino_id === gestorId) {
       return res.status(403).json({
         mensaje: 'No puedes confirmar el check-in de tu propia reserva'
       });
     }
 
-    if (solicitud.estado_reserva !== 'APROBADA') {
+    if (solicitudBase.estado_reserva !== 'APROBADA') {
       return res.status(400).json({
         mensaje: 'Solo se puede confirmar check-in de una reserva APROBADA',
-        estado_actual: solicitud.estado_reserva
+        estado_actual: solicitudBase.estado_reserva
       });
     }
 
-    const resultado = await confirmarCheckinReservaGestion({
-      usuario_publicador_id: usuarioPublicadorId,
+    const resultado = await confirmarCheckinReservaGestionMysqlModel({
       reserva_id: reservaIdNumero,
       gestor_id: gestorId
     });
@@ -1792,7 +1891,15 @@ const confirmarCheckinReserva = async (req, res) => {
 
     return res.json({
       mensaje: 'Check-in confirmado correctamente',
-      reserva: resultado.reserva,
+      reserva: {
+        ...resultado.reserva,
+
+        codigo_inmueble: publicacion.codigo_inmueble || null,
+        nombre_inmueble: publicacion.nombre_inmueble || null,
+        tipo_inmueble: publicacion.tipo_inmueble || null,
+        publicacion_id: publicacion.publicacion_id || null,
+        titulo_publicacion: publicacion.titulo_publicacion || null
+      },
       evento: resultado.evento
     });
 
@@ -1821,32 +1928,57 @@ const confirmarCheckoutReserva = async (req, res) => {
       });
     }
 
-    const solicitud = await obtenerSolicitudGestionPorId(
-      usuarioPublicadorId,
+    const solicitudBase = await obtenerSolicitudGestionPorIdMysqlModel(
       reservaIdNumero
     );
 
-    if (!solicitud) {
+    if (!solicitudBase) {
+      return res.status(404).json({
+        mensaje: 'La reserva no existe'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudBase.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(usuarioPublicadorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
       return res.status(404).json({
         mensaje: 'La reserva no existe o no pertenece a tus publicaciones'
       });
     }
 
-    if (solicitud.inquilino_id === gestorId) {
+    if (solicitudBase.inquilino_id === gestorId) {
       return res.status(403).json({
         mensaje: 'No puedes confirmar el check-out de tu propia reserva'
       });
     }
 
-    if (solicitud.estado_reserva !== 'ACTIVA') {
+    if (solicitudBase.estado_reserva !== 'ACTIVA') {
       return res.status(400).json({
         mensaje: 'Solo se puede confirmar check-out de una reserva ACTIVA',
-        estado_actual: solicitud.estado_reserva
+        estado_actual: solicitudBase.estado_reserva
       });
     }
 
-    const resultado = await confirmarCheckoutReservaGestion({
-      usuario_publicador_id: usuarioPublicadorId,
+    const resultado = await confirmarCheckoutReservaGestionMysqlModel({
       reserva_id: reservaIdNumero,
       gestor_id: gestorId
     });
@@ -1859,7 +1991,15 @@ const confirmarCheckoutReserva = async (req, res) => {
 
     return res.json({
       mensaje: 'Check-out confirmado correctamente',
-      reserva: resultado.reserva,
+      reserva: {
+        ...resultado.reserva,
+
+        codigo_inmueble: publicacion.codigo_inmueble || null,
+        nombre_inmueble: publicacion.nombre_inmueble || null,
+        tipo_inmueble: publicacion.tipo_inmueble || null,
+        publicacion_id: publicacion.publicacion_id || null,
+        titulo_publicacion: publicacion.titulo_publicacion || null
+      },
       evento: resultado.evento
     });
 
