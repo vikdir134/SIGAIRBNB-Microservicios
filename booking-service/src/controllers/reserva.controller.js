@@ -33,6 +33,15 @@ const {
 } = require('../models/reserva.model');
 
 const {
+  listarSolicitudesPorInquilinoMysqlModel,
+  listarReservasPorRangoInternoMysqlModel
+} = require('../models/reservaMysql.model');
+
+const {
+  obtenerPublicacionPorInmueble
+} = require('../clients/catalog.client');
+
+const {
   crearNotificacion
 } = require('../models/notificacion.model');
 
@@ -47,8 +56,6 @@ const MAX_RESERVA_DAYS = Number(process.env.MAX_RESERVA_DAYS || 365);
 const MAX_RESERVA_FUTURE_YEARS = Number(
   process.env.MAX_RESERVA_FUTURE_YEARS || 1
 );
-
-
 
 const limpiarTexto = (valor) => {
   if (valor === undefined || valor === null) return '';
@@ -466,7 +473,40 @@ const obtenerMisSolicitudesReserva = async (req, res) => {
   try {
     const inquilinoId = req.usuario.usuario_id;
 
-    const solicitudes = await listarSolicitudesPorInquilino(inquilinoId);
+    const solicitudesBase = await listarSolicitudesPorInquilinoMysqlModel(
+      inquilinoId
+    );
+
+    const solicitudes = await Promise.all(
+      solicitudesBase.map(async (solicitud) => {
+        const publicacion = await obtenerPublicacionPorInmueble(
+          solicitud.inmueble_id
+        );
+
+        return {
+          ...solicitud,
+
+          codigo_inmueble: publicacion?.codigo_inmueble || null,
+          nombre_inmueble: publicacion?.nombre_inmueble || null,
+          tipo_inmueble: publicacion?.tipo_inmueble || null,
+          subtipo_unidad: publicacion?.subtipo_unidad || null,
+          direccion_linea1: publicacion?.direccion_linea1 || null,
+          numero: publicacion?.numero || null,
+          distrito: publicacion?.distrito || null,
+          ciudad: publicacion?.ciudad || null,
+          provincia: publicacion?.provincia || null,
+          departamento: publicacion?.departamento || null,
+
+          publicacion_id: publicacion?.publicacion_id || null,
+          titulo_publicacion: publicacion?.titulo_publicacion || null,
+          descripcion_corta: publicacion?.descripcion_corta || null,
+          precio_publicado_mensual:
+            publicacion?.precio_publicado_mensual || null,
+
+          foto_principal: publicacion?.foto_principal || null
+        };
+      })
+    );
 
     return res.json({
       mensaje: 'Solicitudes de reserva obtenidas correctamente',
@@ -1947,10 +1987,6 @@ const cancelarReservaInquilino = async (req, res) => {
     });
   }
 };
-
-const {
-  listarReservasPorRangoInternoMysqlModel
-} = require('../models/reservaMysql.model');
 
 const listarReservasPorRangoInterno = async (req, res) => {
   try {

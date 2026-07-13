@@ -11,7 +11,8 @@ const {
   contarFotosPublicacion,
   publicarPublicacionPorId,
   eliminarBorradorPublicacionPorId,
-  eliminarPublicacionPorId
+  eliminarPublicacionPorId,
+  obtenerResumenPublicacionPorInmueble
 } = require('../models/publicacion.model');
 
 const {
@@ -703,6 +704,43 @@ const eliminarPublicacionGestion = async (req, res) => {
   }
 };
 
+const obtenerPublicacionPorInmuebleInterno = async (req, res) => {
+  try {
+    const { inmueble_id } = req.params;
+
+    const inmuebleIdNumero = Number(inmueble_id);
+
+    if (Number.isNaN(inmuebleIdNumero) || inmuebleIdNumero <= 0) {
+      return res.status(400).json({
+        mensaje: 'El ID del inmueble no es válido'
+      });
+    }
+
+    const publicacion = await obtenerResumenPublicacionPorInmueble(
+      inmuebleIdNumero
+    );
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble'
+      });
+    }
+
+    return res.json({
+      mensaje: 'Resumen de publicación por inmueble obtenido correctamente',
+      publicacion
+    });
+
+  } catch (error) {
+    console.error('Error interno al obtener publicación por inmueble:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al obtener publicación por inmueble',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   listarPublicacionesPublicas,
   obtenerDetallePublicacion,
@@ -711,5 +749,6 @@ module.exports = {
   subirFotoPublicacion,
   publicarPublicacionGestion,
   eliminarBorradorPublicacionGestion,
-  eliminarPublicacionGestion
+  eliminarPublicacionGestion,
+  obtenerPublicacionPorInmuebleInterno
 };

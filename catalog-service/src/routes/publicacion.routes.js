@@ -9,7 +9,8 @@ const {
   subirFotoPublicacion,
   publicarPublicacionGestion,
   eliminarBorradorPublicacionGestion,
-  eliminarPublicacionGestion
+  eliminarPublicacionGestion,
+  obtenerPublicacionPorInmuebleInterno
 } = require('../controllers/publicacion.controller');
 
 const {
@@ -61,6 +62,15 @@ router.delete(
   '/gestion/:publicacion_id',
   verificarToken,
   eliminarPublicacionGestion
+);
+
+/*
+  Rutas internas entre microservicios.
+*/
+
+router.get(
+  '/internal/inmuebles/:inmueble_id',
+  obtenerPublicacionPorInmuebleInterno
 );
 
 /*

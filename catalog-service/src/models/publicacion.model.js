@@ -720,6 +720,51 @@ const eliminarPublicacionPorId = async (empresa_id, publicacion_id) => {
   }
 };
 
+const obtenerResumenPublicacionPorInmueble = async (inmueble_id) => {
+  const pool = await getConnection();
+
+  const result = await pool.request()
+    .input('inmueble_id', sql.Int, inmueble_id)
+    .query(`
+      SELECT
+        i.inmueble_id,
+        i.codigo AS codigo_inmueble,
+        i.nombre AS nombre_inmueble,
+        i.tipo_inmueble,
+        i.subtipo_unidad,
+        i.direccion_linea1,
+        i.numero,
+        i.distrito,
+        i.ciudad,
+        i.provincia,
+        i.departamento,
+
+        p.publicacion_id,
+        p.titulo AS titulo_publicacion,
+        p.descripcion_corta,
+        p.precio_publicado_mensual,
+
+        foto.url_foto AS foto_principal
+      FROM catalog.Inmueble i
+      LEFT JOIN catalog.Publicacion p
+        ON p.inmueble_id = i.inmueble_id
+      OUTER APPLY (
+        SELECT TOP 1
+          f.url_foto
+        FROM catalog.InmuebleFoto f
+        WHERE f.publicacion_id = p.publicacion_id
+        ORDER BY
+          CASE WHEN f.es_principal = 1 THEN 0 ELSE 1 END,
+          f.orden_visual ASC
+      ) foto
+      WHERE i.inmueble_id = @inmueble_id
+        AND i.activo = 1
+        AND i.deleted_at IS NULL;
+    `);
+
+  return result.recordset[0] || null;
+};
+
 module.exports = {
   listarPublicaciones,
   obtenerPublicacionPorId,
@@ -733,5 +778,6 @@ module.exports = {
   contarFotosPublicacion,
   publicarPublicacionPorId,
   eliminarBorradorPublicacionPorId,
-  eliminarPublicacionPorId
+  eliminarPublicacionPorId,
+  obtenerResumenPublicacionPorInmueble
 };

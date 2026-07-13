@@ -63,6 +63,38 @@ const listarReservasPorRangoInternoMysqlModel = async ({
   return rows;
 };
 
+const listarSolicitudesPorInquilinoMysqlModel = async (inquilino_id) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      r.reserva_id,
+      r.inmueble_id,
+      r.inquilino_id,
+      r.estado_reserva,
+      r.fecha_solicitud,
+      r.fecha_inicio,
+      r.fecha_fin,
+      r.renta_pactada_mensual,
+      r.monto_total_estimado,
+      r.deposito_garantia,
+      r.moneda,
+      r.observacion_inquilino,
+      r.observacion_gestor,
+      r.motivo_rechazo,
+      r.fecha_decision,
+      r.created_at
+    FROM reserva r
+    WHERE r.inquilino_id = ?
+    ORDER BY r.fecha_solicitud DESC;
+  `;
+
+  const [rows] = await pool.execute(query, [inquilino_id]);
+
+  return rows;
+};
+
 module.exports = {
-  listarReservasPorRangoInternoMysqlModel
+  listarReservasPorRangoInternoMysqlModel,
+  listarSolicitudesPorInquilinoMysqlModel
 };
