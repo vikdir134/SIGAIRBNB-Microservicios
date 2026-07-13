@@ -174,8 +174,59 @@ const actualizarNotificaciones = async ({
   return result.recordset[0];
 };
 
+const obtenerResumenUsuarioPorId = async (usuario_id) => {
+  const pool = await getConnection();
+
+  const result = await pool.request()
+    .input('usuario_id', sql.Int, usuario_id)
+    .query(`
+      SELECT
+        u.usuario_id,
+        u.empresa_id,
+        u.correo,
+        u.estado,
+        u.email_verificado,
+
+        p.perfil_usuario_id,
+        p.nombres,
+        p.apellidos,
+        p.telefono,
+        p.tipo_documento,
+        p.numero_documento,
+        p.ingreso_mensual_referencial,
+        p.tiene_aval_bancario,
+        p.tiene_contrato_trabajo,
+        p.tiene_garante
+      FROM auth.Usuario u
+      LEFT JOIN core.PerfilUsuario p
+        ON p.usuario_id = u.usuario_id
+      WHERE u.usuario_id = @usuario_id
+        AND u.activo = 1;
+    `);
+
+  return result.recordset[0] || null;
+};
+
+const listarEmpresasSecretarioPorUsuarioId = async (usuario_id) => {
+  const pool = await getConnection();
+
+  const result = await pool.request()
+    .input('usuario_id', sql.Int, usuario_id)
+    .query(`
+      SELECT
+        empresa_id
+      FROM core.EmpresaSecretario
+      WHERE secretario_usuario_id = @usuario_id
+        AND activo = 1;
+    `);
+
+  return result.recordset.map((row) => row.empresa_id);
+};
+
 module.exports = {
   obtenerPerfilPorUsuarioId,
   actualizarPerfilBasico,
-  actualizarNotificaciones
+  actualizarNotificaciones,
+  obtenerResumenUsuarioPorId,
+  listarEmpresasSecretarioPorUsuarioId
 };

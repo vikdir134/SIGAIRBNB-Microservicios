@@ -1,7 +1,9 @@
 const {
   obtenerPerfilPorUsuarioId,
   actualizarPerfilBasico,
-  actualizarNotificaciones
+  actualizarNotificaciones,
+  obtenerResumenUsuarioPorId,
+  listarEmpresasSecretarioPorUsuarioId
 } = require('../models/perfil.model');
 
 const {
@@ -188,8 +190,72 @@ const actualizarMisNotificaciones = async (req, res) => {
   }
 };
 
+const obtenerResumenUsuarioInterno = async (req, res) => {
+  try {
+    const { usuario_id } = req.params;
+    const usuarioIdNumero = Number(usuario_id);
+
+    if (Number.isNaN(usuarioIdNumero) || usuarioIdNumero <= 0) {
+      return res.status(400).json({
+        mensaje: 'El ID del usuario no es válido'
+      });
+    }
+
+    const usuario = await obtenerResumenUsuarioPorId(usuarioIdNumero);
+
+    if (!usuario) {
+      return res.status(404).json({
+        mensaje: 'Usuario no encontrado'
+      });
+    }
+
+    return res.json({
+      mensaje: 'Resumen de usuario obtenido correctamente',
+      usuario
+    });
+
+  } catch (error) {
+    console.error('Error al obtener resumen interno de usuario:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al obtener resumen de usuario',
+      error: error.message
+    });
+  }
+};
+
+const obtenerEmpresasSecretarioInterno = async (req, res) => {
+  try {
+    const { usuario_id } = req.params;
+    const usuarioIdNumero = Number(usuario_id);
+
+    if (Number.isNaN(usuarioIdNumero) || usuarioIdNumero <= 0) {
+      return res.status(400).json({
+        mensaje: 'El ID del usuario no es válido'
+      });
+    }
+
+    const empresas = await listarEmpresasSecretarioPorUsuarioId(usuarioIdNumero);
+
+    return res.json({
+      mensaje: 'Empresas como secretario obtenidas correctamente',
+      empresas
+    });
+
+  } catch (error) {
+    console.error('Error al obtener empresas del secretario:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al obtener empresas del secretario',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   obtenerMiPerfil,
   actualizarMiPerfil,
-  actualizarMisNotificaciones
+  actualizarMisNotificaciones,
+  obtenerResumenUsuarioInterno,
+  obtenerEmpresasSecretarioInterno
 };

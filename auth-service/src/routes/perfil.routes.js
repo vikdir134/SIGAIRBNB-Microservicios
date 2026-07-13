@@ -1,15 +1,31 @@
 const express = require('express');
 const router = express.Router();
 
+const validateGatewayRequest = require('../middlewares/validateGatewayRequest');
+
 const {
   obtenerMiPerfil,
   actualizarMiPerfil,
-  actualizarMisNotificaciones
+  actualizarMisNotificaciones,
+  obtenerResumenUsuarioInterno,
+  obtenerEmpresasSecretarioInterno
 } = require('../controllers/perfil.controller');
 
 const {
   verificarToken
 } = require('../middlewares/auth.middleware');
+
+router.get(
+  '/internal/usuarios/:usuario_id/resumen',
+  validateGatewayRequest,
+  obtenerResumenUsuarioInterno
+);
+
+router.get(
+  '/internal/usuarios/:usuario_id/empresas-secretario',
+  validateGatewayRequest,
+  obtenerEmpresasSecretarioInterno
+);
 
 // Obtener perfil del usuario autenticado
 router.get('/', verificarToken, obtenerMiPerfil);

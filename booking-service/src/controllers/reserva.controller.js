@@ -28,13 +28,13 @@ const {
   rechazarSolicitudExtensionReservaGestion,
   obtenerReservaParaCancelacionInquilino,
   cancelarReservaPorInquilino,
-  obtenerEstadoFinancieroReserva,
-  listarReservasPorRangoInternoModel
+  obtenerEstadoFinancieroReserva
 } = require('../models/reserva.model');
 
 const {
+  listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
-  listarReservasPorRangoInternoMysqlModel
+  listarSolicitudesGestionEmpresaMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
@@ -44,6 +44,11 @@ const {
 const {
   crearNotificacion
 } = require('../models/notificacion.model');
+
+const {
+  obtenerResumenUsuario,
+  obtenerEmpresasSecretarioUsuario
+} = require('../clients/auth.client');
 
 const {
   diffDays,
@@ -567,9 +572,75 @@ const obtenerSolicitudesGestion = async (req, res) => {
       });
     }
 
-    const solicitudes = await listarSolicitudesGestionEmpresa(usuarioPublicadorId, {
+    const solicitudesBase = await listarSolicitudesGestionEmpresaMysqlModel({
       estado_reserva: estadoNormalizado || null
     });
+
+    const empresasSecretario = await obtenerEmpresasSecretarioUsuario(
+      usuarioPublicadorId
+    );
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const solicitudesEnriquecidas = await Promise.all(
+      solicitudesBase.map(async (solicitud) => {
+        const [publicacion, inquilino] = await Promise.all([
+          obtenerPublicacionPorInmueble(solicitud.inmueble_id),
+          obtenerResumenUsuario(solicitud.inquilino_id)
+        ]);
+
+        if (!publicacion) {
+          return null;
+        }
+
+        const esPublicador =
+          Number(publicacion.publicado_por_usuario_id) === Number(usuarioPublicadorId);
+
+        const esSecretario =
+          empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+        if (!esPublicador && !esSecretario) {
+          return null;
+        }
+
+        return {
+          ...solicitud,
+
+          codigo_inmueble: publicacion.codigo_inmueble || null,
+          nombre_inmueble: publicacion.nombre_inmueble || null,
+          tipo_inmueble: publicacion.tipo_inmueble || null,
+          subtipo_unidad: publicacion.subtipo_unidad || null,
+          direccion_linea1: publicacion.direccion_linea1 || null,
+          numero: publicacion.numero || null,
+          distrito: publicacion.distrito || null,
+          ciudad: publicacion.ciudad || null,
+          provincia: publicacion.provincia || null,
+          departamento: publicacion.departamento || null,
+
+          publicacion_id: publicacion.publicacion_id || null,
+          titulo_publicacion: publicacion.titulo_publicacion || null,
+          precio_publicado_mensual: publicacion.precio_publicado_mensual || null,
+          publicado_por_usuario_id: publicacion.publicado_por_usuario_id || null,
+          foto_principal: publicacion.foto_principal || null,
+
+          correo_inquilino: inquilino?.correo || null,
+          nombres_inquilino: inquilino?.nombres || null,
+          apellidos_inquilino: inquilino?.apellidos || null,
+          telefono_inquilino: inquilino?.telefono || null,
+          tipo_documento: inquilino?.tipo_documento || null,
+          numero_documento: inquilino?.numero_documento || null,
+          ingreso_mensual_referencial:
+            inquilino?.ingreso_mensual_referencial || null,
+          tiene_aval_bancario: inquilino?.tiene_aval_bancario || false,
+          tiene_contrato_trabajo: inquilino?.tiene_contrato_trabajo || false,
+          tiene_garante: inquilino?.tiene_garante || false
+        };
+      })
+    );
+
+    const solicitudes = solicitudesEnriquecidas.filter(Boolean);
 
     const solicitudesConVetting = solicitudes.map((solicitud) => {
       return {

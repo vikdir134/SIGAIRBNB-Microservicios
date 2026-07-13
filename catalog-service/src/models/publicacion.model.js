@@ -728,6 +728,7 @@ const obtenerResumenPublicacionPorInmueble = async (inmueble_id) => {
     .query(`
       SELECT
         i.inmueble_id,
+        i.empresa_id,
         i.codigo AS codigo_inmueble,
         i.nombre AS nombre_inmueble,
         i.tipo_inmueble,
@@ -743,6 +744,7 @@ const obtenerResumenPublicacionPorInmueble = async (inmueble_id) => {
         p.titulo AS titulo_publicacion,
         p.descripcion_corta,
         p.precio_publicado_mensual,
+        p.publicado_por_usuario_id,
 
         foto.url_foto AS foto_principal
       FROM catalog.Inmueble i
