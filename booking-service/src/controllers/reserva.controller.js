@@ -50,7 +50,13 @@ const {
   aprobarSolicitudReservaPorIdMysqlModel,
   rechazarSolicitudReservaPorIdMysqlModel,
   confirmarCheckinReservaGestionMysqlModel,
-  confirmarCheckoutReservaGestionMysqlModel
+  confirmarCheckoutReservaGestionMysqlModel,
+  obtenerReservaExtensibleInquilinoPorIdMysqlModel,
+  buscarConflictosExtensionReservaMysqlModel,
+  crearSolicitudExtensionReservaMysqlModel,
+  obtenerSolicitudExtensionGestionPorIdMysqlModel,
+  aprobarSolicitudExtensionReservaGestionMysqlModel,
+  rechazarSolicitudExtensionReservaGestionMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
@@ -95,6 +101,17 @@ const validarFechaYYYYMMDD = (fecha) => {
   const fechaDate = new Date(`${fecha}T00:00:00`);
 
   return !Number.isNaN(fechaDate.getTime());
+};
+
+const sumarUnDiaYYYYMMDD = (fecha) => {
+  const fechaDate = new Date(`${fecha}T00:00:00`);
+  fechaDate.setDate(fechaDate.getDate() + 1);
+
+  const anio = fechaDate.getFullYear();
+  const mes = String(fechaDate.getMonth() + 1).padStart(2, '0');
+  const dia = String(fechaDate.getDate()).padStart(2, '0');
+
+  return `${anio}-${mes}-${dia}`;
 };
 
 // HU13 -HELPER- Convierte fechas de SQL Server al formato YYYY-MM-DD
@@ -1727,9 +1744,48 @@ const obtenerResumenVettingGestion = async (req, res) => {
   try {
     const usuarioPublicadorId = req.usuario.usuario_id;
 
-    const solicitudes = await listarSolicitudesGestionEmpresa(usuarioPublicadorId, {
+    const solicitudesBase = await listarSolicitudesGestionEmpresaMysqlModel({
       estado_reserva: null
     });
+
+    const empresasSecretario = await obtenerEmpresasSecretarioUsuario(
+      usuarioPublicadorId
+    );
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const solicitudesEnriquecidas = await Promise.all(
+      solicitudesBase.map(async (solicitud) => {
+        const publicacion = await obtenerPublicacionPorInmueble(
+          solicitud.inmueble_id
+        );
+
+        if (!publicacion) {
+          return null;
+        }
+
+        const esPublicador =
+          Number(publicacion.publicado_por_usuario_id) ===
+          Number(usuarioPublicadorId);
+
+        const esSecretario =
+          empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+        if (!esPublicador && !esSecretario) {
+          return null;
+        }
+
+        return {
+          ...solicitud,
+          publicado_por_usuario_id: publicacion.publicado_por_usuario_id || null,
+          empresa_id: publicacion.empresa_id || null
+        };
+      })
+    );
+
+    const solicitudes = solicitudesEnriquecidas.filter(Boolean);
 
     const solicitudesConVetting = solicitudes.map((solicitud) => {
       return {
@@ -2021,7 +2077,7 @@ const solicitarExtensionReserva = async (req, res) => {
     const {
       nueva_fecha_fin,
       motivo
-    } = req.body;
+    } = req.body || {};
 
     const reservaIdNumero = Number(reserva_id);
 
@@ -2041,15 +2097,15 @@ const solicitarExtensionReserva = async (req, res) => {
     }
 
     if (
-  !isDateNotAbsurd(nueva_fecha_fin, {
-    minYear: new Date().getFullYear(),
-    maxFutureYears: MAX_RESERVA_FUTURE_YEARS
-  })
-) {
-  return res.status(400).json({
-    mensaje: 'La nueva fecha de finalización está fuera del rango permitido para el sistema'
-  });
-}
+      !isDateNotAbsurd(nueva_fecha_fin, {
+        minYear: new Date().getFullYear(),
+        maxFutureYears: MAX_RESERVA_FUTURE_YEARS
+      })
+    ) {
+      return res.status(400).json({
+        mensaje: 'La nueva fecha de finalización está fuera del rango permitido para el sistema'
+      });
+    }
 
     if (isPastDateOnly(nueva_fecha_fin)) {
       return res.status(400).json({
@@ -2065,14 +2121,7 @@ const solicitarExtensionReserva = async (req, res) => {
       });
     }
 
-    /*
-      Busca la reserva validando al mismo tiempo que:
-
-      - Pertenezca al usuario autenticado.
-      - Se encuentre APROBADA o ACTIVA.
-      - No tenga check-out confirmado.
-    */
-    const reserva = await obtenerReservaExtensibleInquilinoPorId(
+    const reserva = await obtenerReservaExtensibleInquilinoPorIdMysqlModel(
       inquilinoId,
       reservaIdNumero
     );
@@ -2111,12 +2160,8 @@ const solicitarExtensionReserva = async (req, res) => {
       });
     }
 
-    /*
-      No permitimos que el inquilino tenga dos solicitudes
-      pendientes para la misma reserva.
-    */
     const solicitudPendiente =
-      await obtenerSolicitudExtensionPendientePorReserva(
+      await obtenerSolicitudExtensionPendientePorReservaMysqlModel(
         reservaIdNumero
       );
 
@@ -2128,49 +2173,41 @@ const solicitarExtensionReserva = async (req, res) => {
       });
     }
 
-    /*
-      Se revisa solamente el periodo adicional:
+    const fechaInicioAdicional = sumarUnDiaYYYYMMDD(fechaFinActual);
 
-      fecha_fin_actual + 1 día
-      hasta nueva_fecha_fin
-    */
-    const conflictos = await buscarConflictosExtensionReserva({
-      empresa_id: reserva.empresa_id,
-      inmueble_id: reserva.inmueble_id,
-      reserva_id: reserva.reserva_id,
-      fecha_fin_actual: fechaFinActual,
-      nueva_fecha_fin
-    });
+    const reservasConflictivas =
+      await buscarConflictosExtensionReservaMysqlModel({
+        inmueble_id: reserva.inmueble_id,
+        reserva_id: reserva.reserva_id,
+        fecha_inicio_adicional: fechaInicioAdicional,
+        nueva_fecha_fin
+      });
 
-    if (
-      conflictos.bloqueos.length > 0 ||
-      conflictos.reservas.length > 0
-    ) {
+    if (reservasConflictivas.length > 0) {
       return res.status(409).json({
         mensaje:
-          'No se puede solicitar la extensión porque el inmueble no está disponible durante todo el periodo adicional',
+          'No se puede solicitar la extensión porque ya existe otra reserva aprobada o activa durante el periodo adicional',
         fecha_fin_actual: fechaFinActual,
         nueva_fecha_fin,
-        bloqueos_solapados: conflictos.bloqueos,
-        reservas_solapadas: conflictos.reservas
+        reservas_solapadas: reservasConflictivas
       });
     }
 
-    const resultado = await crearSolicitudExtensionReserva({
+    const publicacion = await obtenerPublicacionPorInmueble(
+      reserva.inmueble_id
+    );
+
+    const resultado = await crearSolicitudExtensionReservaMysqlModel({
       reserva_id: reservaIdNumero,
       solicitante_usuario_id: inquilinoId,
       nueva_fecha_fin,
       motivo: motivoLimpio || null
     });
 
-    /*
-      Puede devolver null si la reserva cambió de estado o si otra
-      solicitud pendiente fue registrada simultáneamente.
-    */
     if (!resultado) {
       return res.status(409).json({
         mensaje:
-          'No se pudo registrar la solicitud de extensión. Verifica que la reserva siga activa o aprobada y que no exista otra solicitud pendiente'
+          'No se pudo registrar la solicitud de extensión. Verifica que no exista otra solicitud pendiente'
       });
     }
 
@@ -2182,9 +2219,9 @@ const solicitarExtensionReserva = async (req, res) => {
         estado_reserva: reserva.estado_reserva,
         fecha_inicio: reserva.fecha_inicio,
         fecha_fin_actual: fechaFinActual,
-        codigo_inmueble: reserva.codigo_inmueble,
-        nombre_inmueble: reserva.nombre_inmueble,
-        titulo_publicacion: reserva.titulo_publicacion
+        codigo_inmueble: publicacion?.codigo_inmueble || null,
+        nombre_inmueble: publicacion?.nombre_inmueble || null,
+        titulo_publicacion: publicacion?.titulo_publicacion || null
       },
       solicitud_extension: resultado.solicitud_extension,
       evento: resultado.evento
@@ -2208,7 +2245,7 @@ const aprobarSolicitudExtension = async (req, res) => {
   try {
     const gestorId = req.usuario.usuario_id;
     const { solicitud_extension_id } = req.params;
-    const { comentario_decision } = req.body;
+    const { comentario_decision } = req.body || {};
 
     const solicitudExtensionIdNumero = Number(
       solicitud_extension_id
@@ -2235,8 +2272,90 @@ const aprobarSolicitudExtension = async (req, res) => {
       });
     }
 
+    const solicitudExtension =
+      await obtenerSolicitudExtensionGestionPorIdMysqlModel(
+        solicitudExtensionIdNumero
+      );
+
+    if (!solicitudExtension || solicitudExtension.estado !== 'PENDIENTE') {
+      return res.status(404).json({
+        mensaje:
+          'La solicitud de extensión no existe o ya no está pendiente'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudExtension.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(gestorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje: 'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(gestorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
+      return res.status(404).json({
+        mensaje:
+          'La solicitud de extensión no existe, no pertenece a tus inmuebles o ya no está pendiente'
+      });
+    }
+
+    const fechaFinActual = convertirFechaAYYYYMMDD(
+      solicitudExtension.fecha_fin
+    );
+
+    const nuevaFechaFin = convertirFechaAYYYYMMDD(
+      solicitudExtension.nueva_fecha_fin
+    );
+
+    if (!fechaFinActual || !nuevaFechaFin) {
+      return res.status(400).json({
+        mensaje:
+          'No se pudo interpretar la fecha actual o la nueva fecha de finalización'
+      });
+    }
+
+    if (nuevaFechaFin <= fechaFinActual) {
+      return res.status(400).json({
+        mensaje:
+          'La nueva fecha de finalización no es válida',
+        fecha_fin_actual: fechaFinActual,
+        nueva_fecha_fin: nuevaFechaFin
+      });
+    }
+
+    const fechaInicioAdicional = sumarUnDiaYYYYMMDD(fechaFinActual);
+
+    const reservasConflictivas =
+      await buscarConflictosExtensionReservaMysqlModel({
+        inmueble_id: solicitudExtension.inmueble_id,
+        reserva_id: solicitudExtension.reserva_id,
+        fecha_inicio_adicional: fechaInicioAdicional,
+        nueva_fecha_fin: nuevaFechaFin
+      });
+
+    if (reservasConflictivas.length > 0) {
+      return res.status(409).json({
+        mensaje:
+          'No se puede aprobar la extensión porque existe otra reserva aprobada o activa durante el periodo adicional',
+        reservas_solapadas: reservasConflictivas
+      });
+    }
+
     const resultado =
-      await aprobarSolicitudExtensionReservaGestion({
+      await aprobarSolicitudExtensionReservaGestionMysqlModel({
         usuario_gestor_id: gestorId,
         solicitud_extension_id:
           solicitudExtensionIdNumero,
@@ -2245,58 +2364,17 @@ const aprobarSolicitudExtension = async (req, res) => {
       });
 
     if (!resultado) {
-      return res.status(500).json({
-        mensaje:
-          'No se obtuvo una respuesta al aprobar la extensión'
-      });
-    }
-
-    if (resultado.codigo === 'NO_DISPONIBLE') {
       return res.status(404).json({
         mensaje:
           'La solicitud de extensión no existe, no pertenece a tus inmuebles o ya no está pendiente'
       });
     }
 
-    if (resultado.codigo === 'FECHA_INVALIDA') {
-      return res.status(400).json({
-        mensaje:
-          'La nueva fecha de finalización no es válida',
-        fecha_fin_actual:
-          resultado.fecha_fin_actual,
-        nueva_fecha_fin:
-          resultado.nueva_fecha_fin
-      });
-    }
-
-    if (
-      resultado.codigo ===
-      'CONFLICTO_DISPONIBILIDAD'
-    ) {
-      return res.status(409).json({
-        mensaje:
-          'No se puede aprobar la extensión porque el inmueble ya no está disponible durante todo el periodo adicional',
-        bloqueos_solapados:
-          resultado.bloqueos || [],
-        reservas_solapadas:
-          resultado.reservas || []
-      });
-    }
-
-    if (
-      resultado.codigo ===
-      'RESERVA_NO_ACTUALIZADA'
-    ) {
-      return res.status(409).json({
-        mensaje:
-          'La solicitud fue encontrada, pero la reserva ya no puede ser extendida'
-      });
-    }
-
     if (resultado.codigo !== 'OK') {
       return res.status(400).json({
         mensaje:
-          'No se pudo aprobar la solicitud de extensión'
+          'No se pudo aprobar la solicitud de extensión',
+        codigo: resultado.codigo
       });
     }
 
@@ -2305,7 +2383,12 @@ const aprobarSolicitudExtension = async (req, res) => {
         'Solicitud de extensión aprobada correctamente',
       solicitud_extension:
         resultado.solicitud_extension,
-      reserva: resultado.reserva,
+      reserva: {
+        ...resultado.reserva,
+        codigo_inmueble: publicacion.codigo_inmueble || null,
+        nombre_inmueble: publicacion.nombre_inmueble || null,
+        titulo_publicacion: publicacion.titulo_publicacion || null
+      },
       evento: resultado.evento
     });
 
@@ -2330,7 +2413,7 @@ const rechazarSolicitudExtension = async (
   try {
     const gestorId = req.usuario.usuario_id;
     const { solicitud_extension_id } = req.params;
-    const { comentario_decision } = req.body;
+    const { comentario_decision } = req.body || {};
 
     const solicitudExtensionIdNumero = Number(
       solicitud_extension_id
@@ -2364,8 +2447,49 @@ const rechazarSolicitudExtension = async (
       });
     }
 
+    const solicitudExtension =
+      await obtenerSolicitudExtensionGestionPorIdMysqlModel(
+        solicitudExtensionIdNumero
+      );
+
+    if (!solicitudExtension || solicitudExtension.estado !== 'PENDIENTE') {
+      return res.status(404).json({
+        mensaje:
+          'La solicitud de extensión no existe o ya no está pendiente'
+      });
+    }
+
+    const [publicacion, empresasSecretario] = await Promise.all([
+      obtenerPublicacionPorInmueble(solicitudExtension.inmueble_id),
+      obtenerEmpresasSecretarioUsuario(gestorId)
+    ]);
+
+    if (!publicacion) {
+      return res.status(404).json({
+        mensaje:
+          'No se encontró información del inmueble asociado a la reserva'
+      });
+    }
+
+    const empresasSecretarioSet = new Set(
+      empresasSecretario.map((empresaId) => Number(empresaId))
+    );
+
+    const esPublicador =
+      Number(publicacion.publicado_por_usuario_id) === Number(gestorId);
+
+    const esSecretario =
+      empresasSecretarioSet.has(Number(publicacion.empresa_id));
+
+    if (!esPublicador && !esSecretario) {
+      return res.status(404).json({
+        mensaje:
+          'La solicitud de extensión no existe, no pertenece a tus inmuebles o ya no está pendiente'
+      });
+    }
+
     const resultado =
-      await rechazarSolicitudExtensionReservaGestion({
+      await rechazarSolicitudExtensionReservaGestionMysqlModel({
         usuario_gestor_id: gestorId,
         solicitud_extension_id:
           solicitudExtensionIdNumero,

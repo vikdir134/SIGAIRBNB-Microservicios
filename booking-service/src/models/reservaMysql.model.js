@@ -1068,6 +1068,533 @@ const confirmarCheckoutReservaGestionMysqlModel = async ({
   }
 };
 
+const obtenerReservaExtensibleInquilinoPorIdMysqlModel = async (
+  inquilino_id,
+  reserva_id
+) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      reserva_id,
+      inmueble_id,
+      inquilino_id,
+      estado_reserva,
+      fecha_inicio,
+      fecha_fin,
+      fecha_checkout,
+      renta_pactada_mensual,
+      monto_total_estimado,
+      moneda
+    FROM reserva
+    WHERE reserva_id = ?
+      AND inquilino_id = ?
+      AND estado_reserva IN ('APROBADA', 'ACTIVA')
+      AND fecha_checkout IS NULL;
+  `;
+
+  const [rows] = await pool.execute(query, [
+    reserva_id,
+    inquilino_id
+  ]);
+
+  return rows[0] || null;
+};
+
+const buscarConflictosExtensionReservaMysqlModel = async ({
+  inmueble_id,
+  reserva_id,
+  fecha_inicio_adicional,
+  nueva_fecha_fin
+}) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      reserva_id,
+      inmueble_id,
+      inquilino_id,
+      estado_reserva,
+      fecha_inicio,
+      fecha_fin
+    FROM reserva
+    WHERE inmueble_id = ?
+      AND reserva_id <> ?
+      AND estado_reserva IN ('APROBADA', 'ACTIVA')
+      AND (
+        ? <= fecha_fin
+        AND ? >= fecha_inicio
+      )
+    ORDER BY fecha_inicio ASC;
+  `;
+
+  const [rows] = await pool.execute(query, [
+    inmueble_id,
+    reserva_id,
+    fecha_inicio_adicional,
+    nueva_fecha_fin
+  ]);
+
+  return rows;
+};
+
+const crearSolicitudExtensionReservaMysqlModel = async ({
+  reserva_id,
+  solicitante_usuario_id,
+  nueva_fecha_fin,
+  motivo
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [pendientes] = await connection.execute(
+      `
+      SELECT solicitud_extension_id
+      FROM solicitud_extension
+      WHERE reserva_id = ?
+        AND estado = 'PENDIENTE'
+      LIMIT 1;
+      `,
+      [reserva_id]
+    );
+
+    if (pendientes.length > 0) {
+      await connection.rollback();
+      return null;
+    }
+
+    const [extensionResult] = await connection.execute(
+      `
+      INSERT INTO solicitud_extension (
+        reserva_id,
+        solicitante_usuario_id,
+        nueva_fecha_fin,
+        motivo,
+        estado,
+        fecha_solicitud
+      )
+      VALUES (?, ?, ?, ?, 'PENDIENTE', NOW());
+      `,
+      [
+        reserva_id,
+        solicitante_usuario_id,
+        nueva_fecha_fin,
+        motivo
+      ]
+    );
+
+    const extensionId = extensionResult.insertId;
+
+    const [extensionRows] = await connection.execute(
+      `
+      SELECT
+        solicitud_extension_id,
+        reserva_id,
+        solicitante_usuario_id,
+        nueva_fecha_fin,
+        motivo,
+        estado,
+        fecha_solicitud,
+        fecha_decision,
+        decidido_por_usuario_id,
+        comentario_decision
+      FROM solicitud_extension
+      WHERE solicitud_extension_id = ?;
+      `,
+      [extensionId]
+    );
+
+    const descripcionEvento = motivo
+      ? `Solicitud de extensión registrada. Nueva fecha fin: ${nueva_fecha_fin}. Motivo: ${motivo}`
+      : `Solicitud de extensión registrada. Nueva fecha fin: ${nueva_fecha_fin}.`;
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'SOLICITUD_EXTENSION', ?, NOW());
+      `,
+      [
+        reserva_id,
+        solicitante_usuario_id,
+        descripcionEvento.length > 500
+          ? descripcionEvento.slice(0, 497) + '...'
+          : descripcionEvento
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      solicitud_extension: extensionRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+const obtenerSolicitudExtensionGestionPorIdMysqlModel = async (
+  solicitud_extension_id
+) => {
+  const pool = getMySqlPool();
+
+  const query = `
+    SELECT
+      se.solicitud_extension_id,
+      se.reserva_id,
+      se.solicitante_usuario_id,
+      se.nueva_fecha_fin,
+      se.motivo,
+      se.estado,
+      se.fecha_solicitud,
+      se.fecha_decision,
+      se.decidido_por_usuario_id,
+      se.comentario_decision,
+
+      r.inmueble_id,
+      r.inquilino_id,
+      r.estado_reserva,
+      r.fecha_inicio,
+      r.fecha_fin,
+      r.fecha_checkout,
+      r.renta_pactada_mensual,
+      r.monto_total_estimado,
+      r.moneda
+    FROM solicitud_extension se
+    INNER JOIN reserva r
+      ON r.reserva_id = se.reserva_id
+    WHERE se.solicitud_extension_id = ?;
+  `;
+
+  const [rows] = await pool.execute(query, [solicitud_extension_id]);
+
+  return rows[0] || null;
+};
+
+const aprobarSolicitudExtensionReservaGestionMysqlModel = async ({
+  solicitud_extension_id,
+  usuario_gestor_id,
+  comentario_decision
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [extensionRows] = await connection.execute(
+      `
+      SELECT
+        se.solicitud_extension_id,
+        se.reserva_id,
+        se.nueva_fecha_fin,
+        se.estado,
+        r.fecha_fin,
+        r.estado_reserva
+      FROM solicitud_extension se
+      INNER JOIN reserva r
+        ON r.reserva_id = se.reserva_id
+      WHERE se.solicitud_extension_id = ?
+      FOR UPDATE;
+      `,
+      [solicitud_extension_id]
+    );
+
+    const extension = extensionRows[0];
+
+    if (!extension || extension.estado !== 'PENDIENTE') {
+      await connection.rollback();
+      return null;
+    }
+
+    if (!['APROBADA', 'ACTIVA'].includes(extension.estado_reserva)) {
+      await connection.rollback();
+      return {
+        codigo: 'RESERVA_NO_ACTUALIZADA'
+      };
+    }
+
+    await connection.execute(
+      `
+      UPDATE solicitud_extension
+      SET
+        estado = 'APROBADA',
+        fecha_decision = NOW(),
+        decidido_por_usuario_id = ?,
+        comentario_decision = ?
+      WHERE solicitud_extension_id = ?
+        AND estado = 'PENDIENTE';
+      `,
+      [
+        usuario_gestor_id,
+        comentario_decision,
+        solicitud_extension_id
+      ]
+    );
+
+    await connection.execute(
+      `
+      UPDATE reserva
+      SET
+        fecha_fin = ?,
+        updated_at = NOW()
+      WHERE reserva_id = ?
+        AND estado_reserva IN ('APROBADA', 'ACTIVA')
+        AND fecha_checkout IS NULL;
+      `,
+      [
+        extension.nueva_fecha_fin,
+        extension.reserva_id
+      ]
+    );
+
+    const [solicitudRows] = await connection.execute(
+      `
+      SELECT
+        solicitud_extension_id,
+        reserva_id,
+        solicitante_usuario_id,
+        nueva_fecha_fin,
+        motivo,
+        estado,
+        fecha_solicitud,
+        fecha_decision,
+        decidido_por_usuario_id,
+        comentario_decision
+      FROM solicitud_extension
+      WHERE solicitud_extension_id = ?;
+      `,
+      [solicitud_extension_id]
+    );
+
+    const [reservaRows] = await connection.execute(
+      `
+      SELECT
+        reserva_id,
+        inmueble_id,
+        inquilino_id,
+        estado_reserva,
+        fecha_inicio,
+        fecha_fin,
+        renta_pactada_mensual,
+        monto_total_estimado,
+        moneda,
+        fecha_checkin,
+        fecha_checkout,
+        updated_at
+      FROM reserva
+      WHERE reserva_id = ?;
+      `,
+      [extension.reserva_id]
+    );
+
+    const descripcionEvento = comentario_decision
+      ? `Solicitud de extensión aprobada. Nueva fecha fin: ${extension.nueva_fecha_fin}. Comentario: ${comentario_decision}`
+      : `Solicitud de extensión aprobada. Nueva fecha fin: ${extension.nueva_fecha_fin}.`;
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'EXTENSION_APROBADA', ?, NOW());
+      `,
+      [
+        extension.reserva_id,
+        usuario_gestor_id,
+        descripcionEvento.length > 500
+          ? descripcionEvento.slice(0, 497) + '...'
+          : descripcionEvento
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      codigo: 'OK',
+      solicitud_extension: solicitudRows[0],
+      reserva: reservaRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
+const rechazarSolicitudExtensionReservaGestionMysqlModel = async ({
+  solicitud_extension_id,
+  usuario_gestor_id,
+  comentario_decision
+}) => {
+  const pool = getMySqlPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [extensionRows] = await connection.execute(
+      `
+      SELECT
+        se.solicitud_extension_id,
+        se.reserva_id,
+        se.nueva_fecha_fin,
+        se.estado
+      FROM solicitud_extension se
+      WHERE se.solicitud_extension_id = ?
+      FOR UPDATE;
+      `,
+      [solicitud_extension_id]
+    );
+
+    const extension = extensionRows[0];
+
+    if (!extension || extension.estado !== 'PENDIENTE') {
+      await connection.rollback();
+      return null;
+    }
+
+    await connection.execute(
+      `
+      UPDATE solicitud_extension
+      SET
+        estado = 'RECHAZADA',
+        fecha_decision = NOW(),
+        decidido_por_usuario_id = ?,
+        comentario_decision = ?
+      WHERE solicitud_extension_id = ?
+        AND estado = 'PENDIENTE';
+      `,
+      [
+        usuario_gestor_id,
+        comentario_decision,
+        solicitud_extension_id
+      ]
+    );
+
+    const [solicitudRows] = await connection.execute(
+      `
+      SELECT
+        solicitud_extension_id,
+        reserva_id,
+        solicitante_usuario_id,
+        nueva_fecha_fin,
+        motivo,
+        estado,
+        fecha_solicitud,
+        fecha_decision,
+        decidido_por_usuario_id,
+        comentario_decision
+      FROM solicitud_extension
+      WHERE solicitud_extension_id = ?;
+      `,
+      [solicitud_extension_id]
+    );
+
+    const descripcionEvento = comentario_decision
+      ? `Solicitud de extensión rechazada. Comentario: ${comentario_decision}`
+      : 'Solicitud de extensión rechazada.';
+
+    const [eventoResult] = await connection.execute(
+      `
+      INSERT INTO reserva_evento (
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      )
+      VALUES (?, ?, 'EXTENSION_RECHAZADA', ?, NOW());
+      `,
+      [
+        extension.reserva_id,
+        usuario_gestor_id,
+        descripcionEvento.length > 500
+          ? descripcionEvento.slice(0, 497) + '...'
+          : descripcionEvento
+      ]
+    );
+
+    const [eventoRows] = await connection.execute(
+      `
+      SELECT
+        reserva_evento_id,
+        reserva_id,
+        usuario_id,
+        tipo_evento,
+        descripcion,
+        fecha_evento
+      FROM reserva_evento
+      WHERE reserva_evento_id = ?;
+      `,
+      [eventoResult.insertId]
+    );
+
+    await connection.commit();
+
+    return {
+      solicitud_extension: solicitudRows[0],
+      evento: eventoRows[0]
+    };
+
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
@@ -1087,5 +1614,11 @@ module.exports = {
   aprobarSolicitudReservaPorIdMysqlModel,
   rechazarSolicitudReservaPorIdMysqlModel,
   confirmarCheckinReservaGestionMysqlModel,
-  confirmarCheckoutReservaGestionMysqlModel
+  confirmarCheckoutReservaGestionMysqlModel,
+  obtenerReservaExtensibleInquilinoPorIdMysqlModel,
+  buscarConflictosExtensionReservaMysqlModel,
+  crearSolicitudExtensionReservaMysqlModel,
+  obtenerSolicitudExtensionGestionPorIdMysqlModel,
+  aprobarSolicitudExtensionReservaGestionMysqlModel,
+  rechazarSolicitudExtensionReservaGestionMysqlModel
 };
