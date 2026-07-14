@@ -42,8 +42,30 @@ const actualizarRentaInmuebleCatalog = async (inmueble_id, nueva_renta) => {
   return response.data.inmueble || null;
 };
 
+const obtenerPublicacionPorInmuebleCatalog = async (inmueble_id) => {
+  try {
+    const response = await axios.get(
+      `${CATALOG_SERVICE_URL}/api/publicaciones/internal/inmuebles/${inmueble_id}`,
+      {
+        headers: { 'x-gateway-secret': GATEWAY_SECRET },
+        timeout: 10000
+      }
+    );
+
+    return response.data.publicacion || null;
+  } catch (error) {
+    console.error(
+      `Error obteniendo publicación del inmueble ${inmueble_id} desde catalog-service:`,
+      error.message
+    );
+
+    return null;
+  }
+};
+
 module.exports = {
   listarInmueblesConRentaCatalog,
   obtenerInmuebleConRentaCatalog,
-  actualizarRentaInmuebleCatalog
+  actualizarRentaInmuebleCatalog,
+  obtenerPublicacionPorInmuebleCatalog
 };

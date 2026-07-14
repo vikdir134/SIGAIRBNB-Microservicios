@@ -1,4 +1,12 @@
-const { getConnection, sql } = require('../config/db');
+const { getPostgresPool } = require('../config/postgresDb');
+
+const {
+  obtenerReservaFinance
+} = require('../clients/booking.client');
+
+const {
+  obtenerPublicacionPorInmuebleCatalog
+} = require('../clients/catalog.client');
 
 const IGV_PORCENTAJE = 0.18;
 
@@ -9,11 +17,17 @@ const redondear2 = (valor) => {
 const obtenerFechaYYYYMMDD = (valor) => {
   if (!valor) return null;
 
-  if (valor instanceof Date) {
-    return valor.toISOString().slice(0, 10);
-  }
+  const fecha = valor instanceof Date
+    ? valor
+    : new Date(valor);
 
-  return String(valor).slice(0, 10);
+  if (Number.isNaN(fecha.getTime())) return null;
+
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+
+  return `${anio}-${mes}-${dia}`;
 };
 
 const obtenerPeriodoDesdeFecha = (fecha) => {
@@ -39,110 +53,6 @@ const calcularDiasReserva = (fechaInicio, fechaFin) => {
   return Math.max(dias, 1);
 };
 
-const calcularRentaReserva = ({
-  renta_mensual,
-  dias_reserva
-}) => {
-  const rentaMensual = Number(renta_mensual || 0);
-  const dias = Number(dias_reserva || 0);
-
-  if (rentaMensual <= 0 || dias <= 0) {
-    return {
-      cantidad: 0,
-      precio_unitario: 0,
-      importe: 0,
-      descripcion_calculo: 'Renta inválida'
-    };
-  }
-
-  /*
-    Regla:
-    - 30 días = mes completo.
-    - Menos de 30 días = proporcional diario.
-    - Más de 30 días = proporcional sobre base mensual / 30.
-  */
-  const precioUnitarioDiario = redondear2(rentaMensual / 30);
-  const importe = redondear2((rentaMensual / 30) * dias);
-
-  return {
-    cantidad: dias,
-    precio_unitario: precioUnitarioDiario,
-    importe,
-    descripcion_calculo: `${dias} día(s) x ${precioUnitarioDiario}`
-  };
-};
-
-const calcularLineaConceptoReserva = ({
-  concepto,
-  dias_reserva
-}) => {
-  const monto = redondear2(concepto.monto_default);
-
-  const metodoCalculo = String(concepto.metodo_calculo || '')
-    .trim()
-    .toUpperCase();
-
-  /*
-    MANUAL sí debe aparecer, incluso con monto 0,
-    porque el gestor puede editarlo antes de generar la boleta.
-  */
-  if (monto <= 0 && metodoCalculo !== 'MANUAL') {
-    return null;
-  }
-
-  switch (metodoCalculo) {
-    case 'POR_DIA': {
-      return {
-        cantidad: dias_reserva,
-        precio_unitario: monto,
-        importe: redondear2(monto * dias_reserva)
-      };
-    }
-
-    case 'POR_MES': {
-      if (concepto.prorrateable) {
-        return {
-          cantidad: redondear2(dias_reserva / 30),
-          precio_unitario: monto,
-          importe: redondear2((monto / 30) * dias_reserva)
-        };
-      }
-
-      const meses = Math.max(Math.ceil(dias_reserva / 30), 1);
-
-      return {
-        cantidad: meses,
-        precio_unitario: monto,
-        importe: redondear2(monto * meses)
-      };
-    }
-
-    case 'MONTO_FIJO': {
-      return {
-        cantidad: 1,
-        precio_unitario: monto,
-        importe: monto
-      };
-    }
-
-    case 'MANUAL': {
-      return {
-        cantidad: 1,
-        precio_unitario: monto,
-        importe: monto
-      };
-    }
-
-    default: {
-      return {
-        cantidad: 1,
-        precio_unitario: monto,
-        importe: monto
-      };
-    }
-  }
-};
-
 const calcularFechaVencimientoReserva = (fechaInicio, fechaEmision = new Date()) => {
   const inicioTexto = obtenerFechaYYYYMMDD(fechaInicio);
   const emisionTexto = obtenerFechaYYYYMMDD(fechaEmision);
@@ -154,201 +64,139 @@ const calcularFechaVencimientoReserva = (fechaInicio, fechaEmision = new Date())
   fechaVencimiento.setDate(fechaVencimiento.getDate() - 1);
 
   if (fechaVencimiento < emision) {
-    throw new Error('FECHA_VENCIMIENTO_RESERVA_EXPIRADA');
+    return obtenerFechaYYYYMMDD(emision);
   }
 
-  return fechaVencimiento;
+  return obtenerFechaYYYYMMDD(fechaVencimiento);
 };
+
+const mapNumeroRecibo = (recibo) => {
+  if (!recibo) return null;
+
+  return {
+    ...recibo,
+    subtotal: redondear2(recibo.subtotal),
+    igv_total: redondear2(recibo.igv_total),
+    total: redondear2(recibo.total),
+    saldo_pendiente: redondear2(recibo.saldo_pendiente),
+    numero_recibo: `B-${String(recibo.recibo_id).padStart(6, '0')}`,
+    serie_empresa: 'B001',
+    correlativo_empresa: recibo.recibo_id
+  };
+};
+
+const mapNumeroDetalle = (detalle) => ({
+  ...detalle,
+  cantidad: redondear2(detalle.cantidad),
+  precio_unitario: redondear2(detalle.precio_unitario),
+  importe: redondear2(detalle.importe)
+});
 
 const obtenerReservaParaReciboGestion = async ({
   usuario_gestor_id,
   reserva_id
 }) => {
-  const pool = await getConnection();
+  const reserva = await obtenerReservaFinance(reserva_id);
 
-  const result = await pool.request()
-    .input('usuario_gestor_id', sql.Int, usuario_gestor_id)
-    .input('reserva_id', sql.Int, reserva_id)
-    .query(`
-      SELECT
-        r.reserva_id,
-        r.inmueble_id,
-        r.inquilino_id,
-        r.estado_reserva,
-        r.fecha_inicio,
-        r.fecha_fin,
-        r.renta_pactada_mensual,
-        r.monto_total_estimado,
-        r.deposito_garantia,
-        r.moneda,
+  if (!reserva) return null;
 
-        i.empresa_id,
-        i.codigo AS codigo_inmueble,
-        i.nombre AS nombre_inmueble,
-        i.tipo_inmueble,
-        i.direccion_linea1,
-        i.numero,
-        i.distrito,
-        i.ciudad,
-        i.provincia,
-        i.departamento,
+  const publicacion = await obtenerPublicacionPorInmuebleCatalog(
+    reserva.inmueble_id
+  );
 
-        e.razon_social,
-        e.nombre_comercial,
-
-        p.publicacion_id,
-        p.titulo AS titulo_publicacion,
-        p.publicado_por_usuario_id,
-
-        u.correo AS correo_inquilino,
-        pu.nombres AS nombres_inquilino,
-        pu.apellidos AS apellidos_inquilino,
-        pu.tipo_documento,
-        pu.numero_documento,
-        pu.telefono AS telefono_inquilino
-
-      FROM booking.Reserva r
-      INNER JOIN catalog.Inmueble i
-        ON i.inmueble_id = r.inmueble_id
-      INNER JOIN core.Empresa e
-        ON e.empresa_id = i.empresa_id
-      INNER JOIN catalog.Publicacion p
-        ON p.inmueble_id = i.inmueble_id
-      INNER JOIN auth.Usuario u
-        ON u.usuario_id = r.inquilino_id
-      LEFT JOIN core.PerfilUsuario pu
-        ON pu.usuario_id = r.inquilino_id
-
-      WHERE r.reserva_id = @reserva_id
-        AND i.activo = 1
-        AND i.deleted_at IS NULL
-        AND (
-          p.publicado_por_usuario_id = @usuario_gestor_id
-
-          OR EXISTS (
-            SELECT 1
-            FROM core.EmpresaSecretario es
-            WHERE es.empresa_id = i.empresa_id
-              AND es.secretario_usuario_id = @usuario_gestor_id
-              AND es.activo = 1
-          )
-
-          OR EXISTS (
-            SELECT 1
-            FROM auth.Usuario ua
-            INNER JOIN auth.UsuarioRol ur
-              ON ur.usuario_id = ua.usuario_id
-            INNER JOIN auth.Rol rol
-              ON rol.rol_id = ur.rol_id
-            WHERE ua.usuario_id = @usuario_gestor_id
-              AND ua.empresa_id = i.empresa_id
-              AND ua.activo = 1
-              AND ua.deleted_at IS NULL
-              AND rol.nombre = 'ADMIN'
-              AND rol.activo = 1
-          )
-        );
-    `);
-
-  return result.recordset[0] || null;
+  return {
+    ...reserva,
+    empresa_id: publicacion?.empresa_id || null,
+    codigo_inmueble: publicacion?.codigo_inmueble || publicacion?.codigo || `INM-${reserva.inmueble_id}`,
+    nombre_inmueble: publicacion?.nombre_inmueble || publicacion?.nombre || publicacion?.titulo || `Inmueble ${reserva.inmueble_id}`,
+    titulo_publicacion: publicacion?.titulo || null,
+    precio_publicado_mensual: Number(publicacion?.precio_publicado_mensual || 0),
+    usuario_gestor_id
+  };
 };
 
 const obtenerCuentaCobroPorInmueble = async ({
-  transaction,
+  client,
   inmueble_id,
   codigo_inmueble
 }) => {
-  const cuentaExistenteResult = await new sql.Request(transaction)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .query(`
-      SELECT
-        cuenta_cobro_inmueble_id,
-        inmueble_id,
-        numero_recibo_base,
-        dia_vencimiento,
-        activo
-      FROM finance.CuentaCobroInmueble
-      WHERE inmueble_id = @inmueble_id;
-    `);
+  const cuentaExistenteResult = await client.query(
+    `
+    SELECT
+      cuenta_cobro_inmueble_id,
+      inmueble_id,
+      numero_recibo_base,
+      dia_vencimiento,
+      activo,
+      created_at
+    FROM cuenta_cobro_inmueble
+    WHERE inmueble_id = $1
+      AND activo = TRUE
+    LIMIT 1;
+    `,
+    [inmueble_id]
+  );
 
-  const cuentaExistente = cuentaExistenteResult.recordset[0];
+  const cuentaExistente = cuentaExistenteResult.rows[0];
 
-  if (cuentaExistente) {
-    return cuentaExistente;
-  }
+  if (cuentaExistente) return cuentaExistente;
 
   const numeroReciboBase = `REC-${inmueble_id}-${String(codigo_inmueble || 'INM').slice(0, 20)}`;
 
-  const cuentaCreadaResult = await new sql.Request(transaction)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('numero_recibo_base', sql.NVarChar(50), numeroReciboBase)
-    .query(`
-      INSERT INTO finance.CuentaCobroInmueble (
-        inmueble_id,
-        numero_recibo_base,
-        dia_vencimiento,
-        activo
-      )
-      OUTPUT
-        INSERTED.cuenta_cobro_inmueble_id,
-        INSERTED.inmueble_id,
-        INSERTED.numero_recibo_base,
-        INSERTED.dia_vencimiento,
-        INSERTED.activo
-      VALUES (
-        @inmueble_id,
-        @numero_recibo_base,
-        5,
-        1
-      );
-    `);
+  const cuentaCreadaResult = await client.query(
+    `
+    INSERT INTO cuenta_cobro_inmueble (
+      inmueble_id,
+      numero_recibo_base,
+      dia_vencimiento,
+      activo,
+      created_at
+    )
+    VALUES ($1, $2, 5, TRUE, CURRENT_TIMESTAMP)
+    RETURNING
+      cuenta_cobro_inmueble_id,
+      inmueble_id,
+      numero_recibo_base,
+      dia_vencimiento,
+      activo,
+      created_at;
+    `,
+    [
+      inmueble_id,
+      numeroReciboBase
+    ]
+  );
 
-  return cuentaCreadaResult.recordset[0];
+  return cuentaCreadaResult.rows[0];
 };
 
-const obtenerConceptosActivosParaReserva = async ({
-  transaction,
-  dias_reserva
-}) => {
-  const result = await new sql.Request(transaction)
-    .input('dias_reserva', sql.Int, dias_reserva)
-    .query(`
-      SELECT
-        concepto_cobro_id,
-        codigo,
-        nombre,
-        descripcion,
-        tipo_concepto,
-        aplica_igv,
-        monto_default,
-        orden_impresion,
-        categoria,
-        metodo_calculo,
-        aplica_en,
-        aplica_desde_dias,
-        prorrateable
-      FROM finance.ConceptoCobro
-      WHERE activo = 1
-        AND deleted_at IS NULL
-        AND (
-          codigo = 'RENTA_RESERVA'
-          OR (
-            codigo <> 'RENTA_RESERVA'
-            AND aplica_en IN ('RESERVA', 'AMBOS')
-            AND aplica_desde_dias <= @dias_reserva
-           AND (
-  monto_default > 0
-  OR metodo_calculo = 'MANUAL'
-)
-          )
-        )
-      ORDER BY
-        CASE WHEN codigo = 'RENTA_RESERVA' THEN 0 ELSE 1 END,
-        orden_impresion ASC,
-        nombre ASC;
-    `);
+const obtenerConceptosActivosParaReserva = async ({ client }) => {
+  const result = await client.query(`
+    SELECT
+      concepto_cobro_id,
+      codigo,
+      nombre,
+      descripcion,
+      tipo_concepto,
+      es_obligatorio,
+      aplica_igv,
+      monto_default,
+      orden_impresion,
+      activo,
+      created_at
+    FROM concepto_cobro
+    WHERE activo = TRUE
+    ORDER BY orden_impresion ASC, concepto_cobro_id ASC;
+  `);
 
-  return result.recordset;
+  return result.rows.map((concepto) => ({
+    ...concepto,
+    monto_default: redondear2(concepto.monto_default),
+    metodo_calculo: concepto.codigo === 'RENTA_RESERVA'
+      ? 'RENTA_PRORRATEADA'
+      : 'MONTO_FIJO',
+    aplica_desde_dias: 0
+  }));
 };
 
 const construirLineasRecibo = ({
@@ -356,6 +204,15 @@ const construirLineasRecibo = ({
   conceptos,
   dias_reserva
 }) => {
+  const rentaMensual = Number(
+    reserva.renta_pactada_mensual ||
+    reserva.precio_publicado_mensual ||
+    reserva.monto_total_estimado ||
+    0
+  );
+
+  const lineas = [];
+
   const conceptoRenta = conceptos.find(
     (concepto) => concepto.codigo === 'RENTA_RESERVA'
   );
@@ -364,110 +221,53 @@ const construirLineasRecibo = ({
     return {
       ok: false,
       codigo: 'CONCEPTO_RENTA_NO_CONFIGURADO',
-      mensaje:
-        'No existe el concepto del sistema RENTA_RESERVA. Verifica la configuración de conceptos.'
+      mensaje: 'No se encontró el concepto RENTA_RESERVA.'
     };
   }
 
-  const rentaMensual = Number(
-    reserva.renta_pactada_mensual || 0
-  );
-
-  if (rentaMensual <= 0) {
-    return {
-      ok: false,
-      codigo: 'RENTA_INVALIDA',
-      mensaje:
-        'La reserva no tiene una renta mensual válida para generar el recibo.'
-    };
-  }
-
-  const calculoRenta = calcularRentaReserva({
-    renta_mensual: rentaMensual,
-    dias_reserva
-  });
-
-  if (calculoRenta.importe <= 0) {
-    return {
-      ok: false,
-      codigo: 'RENTA_INVALIDA',
-      mensaje:
-        'La reserva no tiene un monto de renta válido para generar el recibo.'
-    };
-  }
-
-  const lineas = [];
+  const precioUnitarioDiario = redondear2(rentaMensual / 30);
+  const importeRenta = redondear2(precioUnitarioDiario * dias_reserva);
 
   lineas.push({
     concepto_cobro_id: conceptoRenta.concepto_cobro_id,
     codigo: conceptoRenta.codigo,
-    descripcion: `Renta de reserva (${dias_reserva} día(s))`,
-    cantidad: calculoRenta.cantidad,
-    precio_unitario: calculoRenta.precio_unitario,
-    importe: calculoRenta.importe,
+    nombre: conceptoRenta.nombre,
+    descripcion: `Renta de reserva por ${dias_reserva} día(s)`,
+    cantidad: dias_reserva,
+    precio_unitario: precioUnitarioDiario,
+    importe: importeRenta,
     aplica_igv: Boolean(conceptoRenta.aplica_igv),
-    orden_impresion: 1
+    orden_impresion: conceptoRenta.orden_impresion || 1
   });
 
-  conceptos
-    .filter((concepto) => concepto.codigo !== 'RENTA_RESERVA')
-    .forEach((concepto, index) => {
-      const calculoConcepto = calcularLineaConceptoReserva({
-        concepto,
-        dias_reserva
-      });
+  for (const concepto of conceptos) {
+    if (concepto.codigo === 'RENTA_RESERVA') continue;
 
-      if (!calculoConcepto) return;
+    const monto = redondear2(concepto.monto_default);
 
-      lineas.push({
-        concepto_cobro_id: concepto.concepto_cobro_id,
-        codigo: concepto.codigo,
-        descripcion: concepto.nombre,
-        cantidad: calculoConcepto.cantidad,
-        precio_unitario: calculoConcepto.precio_unitario,
-        importe: calculoConcepto.importe,
-        aplica_igv: Boolean(concepto.aplica_igv),
-        orden_impresion: index + 2
-      });
+    if (monto <= 0 && !concepto.es_obligatorio) continue;
+
+    lineas.push({
+      concepto_cobro_id: concepto.concepto_cobro_id,
+      codigo: concepto.codigo,
+      nombre: concepto.nombre,
+      descripcion: concepto.descripcion || concepto.nombre,
+      cantidad: 1,
+      precio_unitario: monto,
+      importe: monto,
+      aplica_igv: Boolean(concepto.aplica_igv),
+      orden_impresion: concepto.orden_impresion || 99
     });
+  }
 
   const subtotal = redondear2(
-    lineas.reduce((total, linea) => {
-      return total + Number(linea.importe || 0);
-    }, 0)
+    lineas.reduce((total, linea) => total + Number(linea.importe || 0), 0)
   );
 
   const igv_total = redondear2(
     lineas.reduce((total, linea) => {
       if (!linea.aplica_igv) return total;
-
-      return total + Number(linea.importe || 0) * IGV_PORCENTAJE;
-    }, 0)
-  );
-
-  const total = redondear2(subtotal + igv_total);
-
-  return {
-    ok: true,
-    lineas,
-    subtotal,
-    igv_total,
-    total
-  };
-};
-
-const recalcularTotalesLineas = (lineas) => {
-  const subtotal = redondear2(
-    lineas.reduce((total, linea) => {
-      return total + Number(linea.importe || 0);
-    }, 0)
-  );
-
-  const igv_total = redondear2(
-    lineas.reduce((total, linea) => {
-      if (!linea.aplica_igv) return total;
-
-      return total + Number(linea.importe || 0) * IGV_PORCENTAJE;
+      return total + redondear2(Number(linea.importe || 0) * IGV_PORCENTAJE);
     }, 0)
   );
 
@@ -484,213 +284,166 @@ const recalcularTotalesLineas = (lineas) => {
 
 const aplicarConceptosEditados = ({
   calculo,
-  conceptos_editados
+  conceptos_editados = []
 }) => {
-  if (
-    !Array.isArray(conceptos_editados) ||
-    conceptos_editados.length === 0
-  ) {
+  if (!Array.isArray(conceptos_editados) || conceptos_editados.length === 0) {
     return calculo;
   }
 
   const editadosPorConcepto = new Map();
 
-  conceptos_editados.forEach((item) => {
+  for (const item of conceptos_editados) {
     const conceptoId = Number(item.concepto_cobro_id);
 
-    if (!Number.isInteger(conceptoId) || conceptoId <= 0) {
-      return;
-    }
+    if (!conceptoId) continue;
 
     editadosPorConcepto.set(conceptoId, item);
-  });
+  }
 
   const lineasActualizadas = calculo.lineas.map((linea) => {
-    /*
-      La renta no se debe editar manualmente.
-      La renta siempre se calcula según los días de la reserva.
-    */
-    if (linea.codigo === 'RENTA_RESERVA') {
-      return linea;
-    }
+    const editado = editadosPorConcepto.get(Number(linea.concepto_cobro_id));
 
-    const editado = editadosPorConcepto.get(
-      Number(linea.concepto_cobro_id)
-    );
+    if (!editado) return linea;
 
-    if (!editado) {
-      return linea;
-    }
-
-    const cantidad = redondear2(editado.cantidad);
-    const precioUnitario = redondear2(editado.precio_unitario);
-
-    if (cantidad <= 0 || precioUnitario < 0) {
-      return linea;
-    }
-
+    const cantidad = redondear2(editado.cantidad || linea.cantidad);
+    const precioUnitario = redondear2(editado.precio_unitario || linea.precio_unitario);
     const importe = redondear2(cantidad * precioUnitario);
 
     return {
       ...linea,
+      descripcion: editado.descripcion || linea.descripcion,
       cantidad,
       precio_unitario: precioUnitario,
       importe
     };
   });
 
-  return recalcularTotalesLineas(lineasActualizadas);
-};
+  const subtotal = redondear2(
+    lineasActualizadas.reduce((total, linea) => total + Number(linea.importe || 0), 0)
+  );
 
-const filtrarLineasConImporteParaEmision = (calculo) => {
-  const lineasFiltradas = calculo.lineas.filter((linea) => {
-    const importe = Number(linea.importe || 0);
+  const igv_total = redondear2(
+    lineasActualizadas.reduce((total, linea) => {
+      if (!linea.aplica_igv) return total;
+      return total + redondear2(Number(linea.importe || 0) * IGV_PORCENTAJE);
+    }, 0)
+  );
 
-    /*
-      La renta nunca debería ser 0, pero por seguridad
-      se mantiene si es RENTA_RESERVA.
-    */
-    if (linea.codigo === 'RENTA_RESERVA') {
-      return true;
-    }
-
-    return importe > 0;
-  });
-
-  return recalcularTotalesLineas(lineasFiltradas);
-};
-
-const obtenerReciboCompletoPorId = async (recibo_id) => {
-  const pool = await getConnection();
-
-  const reciboResult = await pool.request()
-    .input('recibo_id', sql.Int, recibo_id)
-    .query(`
-      SELECT
-        r.recibo_id,
-        r.cuenta_cobro_inmueble_id,
-        r.reserva_id,
-        r.periodo_anio,
-        r.periodo_mes,
-        r.fecha_emision,
-        r.fecha_vencimiento,
-        r.estado_recibo,
-        r.subtotal,
-        r.igv_total,
-        r.total,
-        r.saldo_pendiente,
-        r.emitido_por_usuario_id,
-        r.pdf_url,
-        r.observaciones,
-        r.created_at,
-        r.updated_at,
-
-        cc.numero_recibo_base,
-
-        res.inmueble_id,
-        res.inquilino_id,
-        res.fecha_inicio,
-        res.fecha_fin,
-        res.renta_pactada_mensual,
-        res.moneda,
-
-        i.empresa_id,
-
-CONCAT(
-  'B',
-  RIGHT('000' + CAST(i.empresa_id AS VARCHAR(10)), 3)
-) AS serie_empresa,
-
-(
-  SELECT COUNT(*)
-  FROM finance.Recibo r2
-  INNER JOIN booking.Reserva res2
-    ON res2.reserva_id = r2.reserva_id
-  INNER JOIN catalog.Inmueble i2
-    ON i2.inmueble_id = res2.inmueble_id
-  WHERE i2.empresa_id = i.empresa_id
-    AND r2.estado_recibo <> 'ANULADO'
-    AND r2.recibo_id <= r.recibo_id
-) AS correlativo_empresa,
-
-i.codigo AS codigo_inmueble,
-        i.nombre AS nombre_inmueble,
-        i.tipo_inmueble,
-        i.direccion_linea1,
-        i.numero,
-        i.distrito,
-        i.ciudad,
-        i.provincia,
-        i.departamento,
-
-        e.razon_social,
-        e.nombre_comercial,
-
-        u.correo AS correo_inquilino,
-        pu.nombres AS nombres_inquilino,
-        pu.apellidos AS apellidos_inquilino,
-        pu.tipo_documento,
-        pu.numero_documento,
-        pu.telefono AS telefono_inquilino
-
-      FROM finance.Recibo r
-      INNER JOIN finance.CuentaCobroInmueble cc
-        ON cc.cuenta_cobro_inmueble_id = r.cuenta_cobro_inmueble_id
-      LEFT JOIN booking.Reserva res
-        ON res.reserva_id = r.reserva_id
-      LEFT JOIN catalog.Inmueble i
-        ON i.inmueble_id = res.inmueble_id
-      LEFT JOIN core.Empresa e
-        ON e.empresa_id = i.empresa_id
-      LEFT JOIN auth.Usuario u
-        ON u.usuario_id = res.inquilino_id
-      LEFT JOIN core.PerfilUsuario pu
-        ON pu.usuario_id = res.inquilino_id
-      WHERE r.recibo_id = @recibo_id;
-    `);
-
-  const recibo = reciboResult.recordset[0];
-
-  if (!recibo) {
-    return null;
-  }
-
-  const detallesResult = await pool.request()
-    .input('recibo_id', sql.Int, recibo_id)
-    .query(`
-      SELECT
-        rd.recibo_detalle_id,
-        rd.recibo_id,
-        rd.concepto_cobro_id,
-        rd.descripcion,
-        rd.cantidad,
-        rd.precio_unitario,
-        rd.importe,
-        rd.orden_impresion,
-        rd.created_at,
-
-        cc.codigo AS codigo_concepto,
-        cc.nombre AS nombre_concepto,
-        cc.aplica_igv
-      FROM finance.ReciboDetalle rd
-      INNER JOIN finance.ConceptoCobro cc
-        ON cc.concepto_cobro_id = rd.concepto_cobro_id
-      WHERE rd.recibo_id = @recibo_id
-      ORDER BY rd.orden_impresion ASC;
-    `);
+  const total = redondear2(subtotal + igv_total);
 
   return {
-    recibo,
-    detalles: detallesResult.recordset
+    lineas: lineasActualizadas,
+    subtotal,
+    igv_total,
+    total
   };
 };
 
+const obtenerReciboCompletoPorId = async (recibo_id) => {
+  const pool = getPostgresPool();
+
+  const reciboResult = await pool.query(
+    `
+    SELECT
+      r.recibo_id,
+      r.cuenta_cobro_inmueble_id,
+      r.reserva_id,
+      r.periodo_anio,
+      r.periodo_mes,
+      r.fecha_emision,
+      r.fecha_vencimiento,
+      r.estado_recibo,
+      r.subtotal,
+      r.igv_total,
+      r.total,
+      r.saldo_pendiente,
+      r.generado_desde_recibo_id,
+      r.emitido_por_usuario_id,
+      r.pdf_url,
+      r.observaciones,
+      r.created_at,
+      r.updated_at,
+
+      cc.inmueble_id,
+      cc.numero_recibo_base
+    FROM recibo r
+    INNER JOIN cuenta_cobro_inmueble cc
+      ON cc.cuenta_cobro_inmueble_id = r.cuenta_cobro_inmueble_id
+    WHERE r.recibo_id = $1;
+    `,
+    [recibo_id]
+  );
+
+  const reciboBase = reciboResult.rows[0];
+
+  if (!reciboBase) return null;
+
+  const detallesResult = await pool.query(
+    `
+    SELECT
+      rd.recibo_detalle_id,
+      rd.recibo_id,
+      rd.concepto_cobro_id,
+      rd.descripcion,
+      rd.cantidad,
+      rd.precio_unitario,
+      rd.importe,
+      rd.orden_impresion,
+      rd.created_at,
+
+      cc.codigo AS codigo_concepto,
+      cc.nombre AS concepto,
+      cc.aplica_igv
+    FROM recibo_detalle rd
+    INNER JOIN concepto_cobro cc
+      ON cc.concepto_cobro_id = rd.concepto_cobro_id
+    WHERE rd.recibo_id = $1
+    ORDER BY rd.orden_impresion ASC, rd.recibo_detalle_id ASC;
+    `,
+    [recibo_id]
+  );
+
+  let reserva = null;
+  let publicacion = null;
+
+  if (reciboBase.reserva_id) {
+    reserva = await obtenerReservaFinance(reciboBase.reserva_id);
+  }
+
+  if (reciboBase.inmueble_id) {
+    publicacion = await obtenerPublicacionPorInmuebleCatalog(
+      reciboBase.inmueble_id
+    );
+  }
+
+  const recibo = mapNumeroRecibo({
+    ...reciboBase,
+    codigo_inmueble: publicacion?.codigo_inmueble || publicacion?.codigo || null,
+    inmueble: publicacion?.nombre_inmueble || publicacion?.nombre || publicacion?.titulo || null,
+    nombre_inmueble: publicacion?.nombre_inmueble || publicacion?.nombre || publicacion?.titulo || null,
+    titulo_publicacion: publicacion?.titulo || null,
+
+    inquilino_id: reserva?.inquilino_id || null,
+    nombre_inquilino: reserva?.inquilino_id
+      ? `Usuario ${reserva.inquilino_id}`
+      : null,
+
+    fecha_inicio: reserva?.fecha_inicio || null,
+    fecha_fin: reserva?.fecha_fin || null,
+    moneda: reserva?.moneda || 'PEN'
+  });
+
+  return {
+    recibo,
+    detalles: detallesResult.rows.map(mapNumeroDetalle)
+  };
+};
 
 const obtenerVistaPreviaReciboReservaGestion = async ({
   usuario_gestor_id,
   reserva_id
 }) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
   const reserva = await obtenerReservaParaReciboGestion({
     usuario_gestor_id,
@@ -699,37 +452,31 @@ const obtenerVistaPreviaReciboReservaGestion = async ({
 
   if (!reserva) {
     return {
-      ok: false,
       codigo: 'RESERVA_NO_ENCONTRADA',
-      mensaje:
-        'La reserva no existe o no pertenece a la empresa gestionada.'
+      mensaje: 'No se encontró la reserva.'
     };
   }
 
   const estadosPermitidos = ['APROBADA', 'ACTIVA', 'FINALIZADA'];
 
-  if (!estadosPermitidos.includes(reserva.estado_reserva)) {
+  if (!estadosPermitidos.includes(String(reserva.estado_reserva).toUpperCase())) {
     return {
-      ok: false,
       codigo: 'ESTADO_NO_PERMITIDO',
-      mensaje:
-        'Solo se puede revisar boleta para reservas aprobadas, activas o finalizadas.',
-      estado_actual: reserva.estado_reserva
+      mensaje: 'La reserva no está en un estado permitido para generar recibo.'
     };
   }
 
-  const reciboExistenteResult = await pool.request()
-    .input('reserva_id', sql.Int, reserva.reserva_id)
-    .query(`
-      SELECT TOP 1
-        recibo_id
-      FROM finance.Recibo
-      WHERE reserva_id = @reserva_id
-        AND estado_recibo <> 'ANULADO'
-      ORDER BY recibo_id DESC;
-    `);
+  const reciboExistenteResult = await pool.query(
+    `
+    SELECT recibo_id
+    FROM recibo
+    WHERE reserva_id = $1
+    LIMIT 1;
+    `,
+    [reserva.reserva_id]
+  );
 
-  const reciboExistente = reciboExistenteResult.recordset[0];
+  const reciboExistente = reciboExistenteResult.rows[0];
 
   if (reciboExistente) {
     const reciboCompleto = await obtenerReciboCompletoPorId(
@@ -737,12 +484,9 @@ const obtenerVistaPreviaReciboReservaGestion = async ({
     );
 
     return {
-      ok: false,
       codigo: 'RECIBO_EXISTENTE',
-      mensaje:
-        'Esta reserva ya tiene una boleta digital generada.',
-      recibo: reciboCompleto?.recibo || null,
-      detalles: reciboCompleto?.detalles || []
+      mensaje: 'Ya existe una boleta generada para esta reserva.',
+      ...reciboCompleto
     };
   }
 
@@ -751,9 +495,12 @@ const obtenerVistaPreviaReciboReservaGestion = async ({
     reserva.fecha_fin
   );
 
+  const clientLike = {
+    query: (...args) => pool.query(...args)
+  };
+
   const conceptos = await obtenerConceptosActivosParaReserva({
-    transaction: pool,
-    dias_reserva: diasReserva
+    client: clientLike
   });
 
   const calculo = construirLineasRecibo({
@@ -762,13 +509,7 @@ const obtenerVistaPreviaReciboReservaGestion = async ({
     dias_reserva: diasReserva
   });
 
-  if (!calculo.ok) {
-    return {
-      ok: false,
-      codigo: calculo.codigo,
-      mensaje: calculo.mensaje
-    };
-  }
+  if (calculo.codigo) return calculo;
 
   const fechaVencimiento = calcularFechaVencimientoReserva(
     reserva.fecha_inicio
@@ -779,16 +520,10 @@ const obtenerVistaPreviaReciboReservaGestion = async ({
       ? redondear2(Number(linea.importe || 0) * IGV_PORCENTAJE)
       : 0;
 
-    const totalLinea = redondear2(
-      Number(linea.importe || 0) + igv
-    );
-
     return {
-      ...linea,
-      igv,
-      total_linea: totalLinea,
-      obligatorio: linea.codigo === 'RENTA_RESERVA',
-      editable: linea.codigo !== 'RENTA_RESERVA'
+      ok: false,
+      codigo: 'RESERVA_NO_ENCONTRADA',
+      mensaje: 'No se encontró la reserva.'
     };
   });
 
@@ -807,14 +542,14 @@ const obtenerVistaPreviaReciboReservaGestion = async ({
 const generarReciboReservaGestion = async ({
   usuario_gestor_id,
   reserva_id,
-  observaciones = null,
+  observaciones,
   conceptos_editados = []
 }) => {
-  const pool = await getConnection();
-  const transaction = new sql.Transaction(pool);
+  const pool = getPostgresPool();
+  const client = await pool.connect();
 
   try {
-    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    await client.query('BEGIN');
 
     const reserva = await obtenerReservaParaReciboGestion({
       usuario_gestor_id,
@@ -822,45 +557,39 @@ const generarReciboReservaGestion = async ({
     });
 
     if (!reserva) {
-      await transaction.rollback();
-
+      await client.query('ROLLBACK');
       return {
         ok: false,
         codigo: 'RESERVA_NO_ENCONTRADA',
-        mensaje:
-          'La reserva no existe o no pertenece a la empresa gestionada.'
+        mensaje: 'No se encontró la reserva.'
       };
     }
 
     const estadosPermitidos = ['APROBADA', 'ACTIVA', 'FINALIZADA'];
 
-    if (!estadosPermitidos.includes(reserva.estado_reserva)) {
-      await transaction.rollback();
-
+    if (!estadosPermitidos.includes(String(reserva.estado_reserva).toUpperCase())) {
+      await client.query('ROLLBACK');
       return {
         ok: false,
         codigo: 'ESTADO_NO_PERMITIDO',
-        mensaje:
-          'Solo se puede generar boleta para reservas aprobadas, activas o finalizadas.',
-        estado_actual: reserva.estado_reserva
+        mensaje: 'La reserva no está en un estado permitido para generar recibo.'
       };
     }
 
-    const reciboExistenteResult = await new sql.Request(transaction)
-      .input('reserva_id', sql.Int, reserva.reserva_id)
-      .query(`
-        SELECT TOP 1
-          recibo_id
-        FROM finance.Recibo
-        WHERE reserva_id = @reserva_id
-          AND estado_recibo <> 'ANULADO'
-        ORDER BY recibo_id DESC;
-      `);
+    const reciboExistenteResult = await client.query(
+      `
+      SELECT recibo_id
+      FROM recibo
+      WHERE reserva_id = $1
+      LIMIT 1;
+      `,
+      [reserva.reserva_id]
+    );
 
-    const reciboExistente = reciboExistenteResult.recordset[0];
+    const reciboExistente = reciboExistenteResult.rows[0];
 
     if (reciboExistente) {
-      await transaction.rollback();
+      await client.query('ROLLBACK');
 
       const reciboCompleto = await obtenerReciboCompletoPorId(
         reciboExistente.recibo_id
@@ -869,24 +598,18 @@ const generarReciboReservaGestion = async ({
       return {
         ok: false,
         codigo: 'RECIBO_EXISTENTE',
-        mensaje:
-          'Esta reserva ya tiene una boleta digital generada.',
-        recibo: reciboCompleto?.recibo || null,
-        detalles: reciboCompleto?.detalles || []
+        mensaje: 'Ya existe una boleta generada para esta reserva.',
+        ...reciboCompleto
       };
     }
 
     const cuentaCobro = await obtenerCuentaCobroPorInmueble({
-      transaction,
+      client,
       inmueble_id: reserva.inmueble_id,
       codigo_inmueble: reserva.codigo_inmueble
     });
 
-    const { anio, mes } = obtenerPeriodoDesdeFecha(
-      reserva.fecha_inicio
-    );
-
-    
+    const { anio, mes } = obtenerPeriodoDesdeFecha(reserva.fecha_inicio);
 
     const diasReserva = calcularDiasReserva(
       reserva.fecha_inicio,
@@ -894,144 +617,124 @@ const generarReciboReservaGestion = async ({
     );
 
     const conceptos = await obtenerConceptosActivosParaReserva({
-      transaction,
+      client
+    });
+
+    const calculoBase = construirLineasRecibo({
+      reserva,
+      conceptos,
       dias_reserva: diasReserva
     });
 
-  const calculoBase = construirLineasRecibo({
-  reserva,
-  conceptos,
-  dias_reserva: diasReserva
-});
-
-if (!calculoBase.ok) {
-  await transaction.rollback();
-
-  return {
-    ok: false,
-    codigo: calculoBase.codigo,
-    mensaje: calculoBase.mensaje
-  };
-}
-
-const calculoConEditados = aplicarConceptosEditados({
-  calculo: calculoBase,
-  conceptos_editados
-});
-
-const calculo = filtrarLineasConImporteParaEmision(
-  calculoConEditados
-);
-
-    const fechaVencimiento = calcularFechaVencimientoReserva(
-  reserva.fecha_inicio
-);
-
-    const reciboResult = await new sql.Request(transaction)
-      .input(
-        'cuenta_cobro_inmueble_id',
-        sql.Int,
-        cuentaCobro.cuenta_cobro_inmueble_id
-      )
-      .input('reserva_id', sql.Int, reserva.reserva_id)
-      .input('periodo_anio', sql.Int, anio)
-      .input('periodo_mes', sql.TinyInt, mes)
-      .input('fecha_vencimiento', sql.Date, fechaVencimiento)
-      .input('subtotal', sql.Decimal(12, 2), calculo.subtotal)
-      .input('igv_total', sql.Decimal(12, 2), calculo.igv_total)
-      .input('total', sql.Decimal(12, 2), calculo.total)
-      .input('saldo_pendiente', sql.Decimal(12, 2), calculo.total)
-      .input('emitido_por_usuario_id', sql.Int, usuario_gestor_id)
-      .input(
-        'observaciones',
-        sql.NVarChar(500),
-        observaciones || 'Boleta digital generada desde la reserva.'
-      )
-      .query(`
-        INSERT INTO finance.Recibo (
-          cuenta_cobro_inmueble_id,
-          reserva_id,
-          periodo_anio,
-          periodo_mes,
-          fecha_vencimiento,
-          estado_recibo,
-          subtotal,
-          igv_total,
-          total,
-          saldo_pendiente,
-          emitido_por_usuario_id,
-          observaciones
-        )
-        OUTPUT
-          INSERTED.recibo_id,
-          INSERTED.cuenta_cobro_inmueble_id,
-          INSERTED.reserva_id,
-          INSERTED.periodo_anio,
-          INSERTED.periodo_mes,
-          INSERTED.fecha_emision,
-          INSERTED.fecha_vencimiento,
-          INSERTED.estado_recibo,
-          INSERTED.subtotal,
-          INSERTED.igv_total,
-          INSERTED.total,
-          INSERTED.saldo_pendiente,
-          INSERTED.emitido_por_usuario_id,
-          INSERTED.observaciones,
-          INSERTED.created_at
-        VALUES (
-          @cuenta_cobro_inmueble_id,
-          @reserva_id,
-          @periodo_anio,
-          @periodo_mes,
-          @fecha_vencimiento,
-          'EMITIDO',
-          @subtotal,
-          @igv_total,
-          @total,
-          @saldo_pendiente,
-          @emitido_por_usuario_id,
-          @observaciones
-        );
-      `);
-
-    const recibo = reciboResult.recordset[0];
-
-    for (const linea of calculo.lineas) {
-      await new sql.Request(transaction)
-        .input('recibo_id', sql.Int, recibo.recibo_id)
-        .input('concepto_cobro_id', sql.Int, linea.concepto_cobro_id)
-        .input('descripcion', sql.NVarChar(200), linea.descripcion)
-        .input('cantidad', sql.Decimal(12, 2), linea.cantidad)
-        .input('precio_unitario', sql.Decimal(12, 2), linea.precio_unitario)
-        .input('importe', sql.Decimal(12, 2), linea.importe)
-        .input('orden_impresion', sql.Int, linea.orden_impresion)
-        .query(`
-          INSERT INTO finance.ReciboDetalle (
-            recibo_id,
-            concepto_cobro_id,
-            descripcion,
-            cantidad,
-            precio_unitario,
-            importe,
-            orden_impresion
-          )
-          VALUES (
-            @recibo_id,
-            @concepto_cobro_id,
-            @descripcion,
-            @cantidad,
-            @precio_unitario,
-            @importe,
-            @orden_impresion
-          );
-        `);
+    if (calculoBase.codigo) {
+      await client.query('ROLLBACK');
+      return calculoBase;
     }
 
-    await transaction.commit();
+    const calculo = aplicarConceptosEditados({
+      calculo: calculoBase,
+      conceptos_editados
+    });
 
-    const reciboCompleto = await obtenerReciboCompletoPorId(
-      recibo.recibo_id
+    const fechaEmision = obtenerFechaYYYYMMDD(new Date());
+    const fechaVencimiento = calcularFechaVencimientoReserva(
+      reserva.fecha_inicio
     );
+
+    const reciboResult = await client.query(
+      `
+      INSERT INTO recibo (
+        cuenta_cobro_inmueble_id,
+        reserva_id,
+        periodo_anio,
+        periodo_mes,
+        fecha_emision,
+        fecha_vencimiento,
+        estado_recibo,
+        subtotal,
+        igv_total,
+        total,
+        saldo_pendiente,
+        generado_desde_recibo_id,
+        emitido_por_usuario_id,
+        pdf_url,
+        observaciones,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, 'PENDIENTE',
+        $7, $8, $9, $9,
+        NULL, $10, NULL, $11,
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      )
+      RETURNING
+        recibo_id,
+        cuenta_cobro_inmueble_id,
+        reserva_id,
+        periodo_anio,
+        periodo_mes,
+        fecha_emision,
+        fecha_vencimiento,
+        estado_recibo,
+        subtotal,
+        igv_total,
+        total,
+        saldo_pendiente,
+        generado_desde_recibo_id,
+        emitido_por_usuario_id,
+        pdf_url,
+        observaciones,
+        created_at,
+        updated_at;
+      `,
+      [
+        cuentaCobro.cuenta_cobro_inmueble_id,
+        reserva.reserva_id,
+        anio,
+        mes,
+        fechaEmision,
+        fechaVencimiento,
+        calculo.subtotal,
+        calculo.igv_total,
+        calculo.total,
+        usuario_gestor_id || null,
+        observaciones || null
+      ]
+    );
+
+    const recibo = reciboResult.rows[0];
+
+    for (const linea of calculo.lineas) {
+      await client.query(
+        `
+        INSERT INTO recibo_detalle (
+          recibo_id,
+          concepto_cobro_id,
+          descripcion,
+          cantidad,
+          precio_unitario,
+          importe,
+          orden_impresion,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP);
+        `,
+        [
+          recibo.recibo_id,
+          linea.concepto_cobro_id,
+          linea.descripcion,
+          linea.cantidad,
+          linea.precio_unitario,
+          linea.importe,
+          linea.orden_impresion
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    const reciboCompleto = await obtenerReciboCompletoPorId(recibo.recibo_id);
 
     return {
       ok: true,
@@ -1040,16 +743,10 @@ const calculo = filtrarLineasConImporteParaEmision(
       reserva
     };
   } catch (error) {
-    try {
-      await transaction.rollback();
-    } catch (rollbackError) {
-      console.error(
-        'Error al revertir generación de recibo:',
-        rollbackError
-      );
-    }
-
+    await client.query('ROLLBACK');
     throw error;
+  } finally {
+    client.release();
   }
 };
 
@@ -1057,175 +754,65 @@ const listarRecibosReservaAutorizados = async ({
   usuario_id,
   reserva_id
 }) => {
-  const pool = await getConnection();
+  const reserva = await obtenerReservaFinance(reserva_id);
 
-  const result = await pool.request()
-    .input('usuario_id', sql.Int, usuario_id)
-    .input('reserva_id', sql.Int, reserva_id)
-    .query(`
-      SELECT
-        r.recibo_id,
-        r.cuenta_cobro_inmueble_id,
-        r.reserva_id,
-        r.periodo_anio,
-        r.periodo_mes,
-        r.fecha_emision,
-        r.fecha_vencimiento,
-        r.estado_recibo,
-        r.subtotal,
-        r.igv_total,
-        r.total,
-        r.saldo_pendiente,
-        r.pdf_url,
-        r.observaciones,
-        r.created_at,
+  if (!reserva) return [];
 
-        cc.numero_recibo_base,
+  const pool = getPostgresPool();
 
-        res.inquilino_id,
-        res.fecha_inicio,
-        res.fecha_fin,
-        res.moneda,
+  const result = await pool.query(
+    `
+    SELECT
+      r.recibo_id,
+      r.cuenta_cobro_inmueble_id,
+      r.reserva_id,
+      r.periodo_anio,
+      r.periodo_mes,
+      r.fecha_emision,
+      r.fecha_vencimiento,
+      r.estado_recibo,
+      r.subtotal,
+      r.igv_total,
+      r.total,
+      r.saldo_pendiente,
+      r.pdf_url,
+      r.observaciones,
+      r.created_at,
+      r.updated_at,
 
-       i.empresa_id,
+      cc.inmueble_id,
+      cc.numero_recibo_base
+    FROM recibo r
+    INNER JOIN cuenta_cobro_inmueble cc
+      ON cc.cuenta_cobro_inmueble_id = r.cuenta_cobro_inmueble_id
+    WHERE r.reserva_id = $1
+    ORDER BY r.created_at DESC, r.recibo_id DESC;
+    `,
+    [reserva_id]
+  );
 
-CONCAT(
-  'B',
-  RIGHT('000' + CAST(i.empresa_id AS VARCHAR(10)), 3)
-) AS serie_empresa,
-
-(
-  SELECT COUNT(*)
-  FROM finance.Recibo r2
-  INNER JOIN booking.Reserva res2
-    ON res2.reserva_id = r2.reserva_id
-  INNER JOIN catalog.Inmueble i2
-    ON i2.inmueble_id = res2.inmueble_id
-  WHERE i2.empresa_id = i.empresa_id
-    AND r2.estado_recibo <> 'ANULADO'
-    AND r2.recibo_id <= r.recibo_id
-) AS correlativo_empresa,
-
-i.codigo AS codigo_inmueble,
-        i.nombre AS nombre_inmueble,
-        i.tipo_inmueble
-
-      FROM finance.Recibo r
-      INNER JOIN finance.CuentaCobroInmueble cc
-        ON cc.cuenta_cobro_inmueble_id = r.cuenta_cobro_inmueble_id
-      INNER JOIN booking.Reserva res
-        ON res.reserva_id = r.reserva_id
-      INNER JOIN catalog.Inmueble i
-        ON i.inmueble_id = res.inmueble_id
-      WHERE r.reserva_id = @reserva_id
-        AND r.estado_recibo <> 'ANULADO'
-        AND (
-          res.inquilino_id = @usuario_id
-
-          OR EXISTS (
-            SELECT 1
-            FROM catalog.Publicacion p
-            WHERE p.inmueble_id = i.inmueble_id
-              AND p.publicado_por_usuario_id = @usuario_id
-          )
-
-          OR EXISTS (
-            SELECT 1
-            FROM core.EmpresaSecretario es
-            WHERE es.empresa_id = i.empresa_id
-              AND es.secretario_usuario_id = @usuario_id
-              AND es.activo = 1
-          )
-
-          OR EXISTS (
-            SELECT 1
-            FROM auth.Usuario ua
-            INNER JOIN auth.UsuarioRol ur
-              ON ur.usuario_id = ua.usuario_id
-            INNER JOIN auth.Rol rol
-              ON rol.rol_id = ur.rol_id
-            WHERE ua.usuario_id = @usuario_id
-              AND ua.empresa_id = i.empresa_id
-              AND ua.activo = 1
-              AND ua.deleted_at IS NULL
-              AND rol.nombre = 'ADMIN'
-              AND rol.activo = 1
-          )
-        )
-      ORDER BY r.fecha_emision DESC;
-    `);
-
-  return result.recordset;
+  return result.rows.map((recibo) => mapNumeroRecibo({
+    ...recibo,
+    inquilino_id: reserva.inquilino_id,
+    moneda: reserva.moneda || 'PEN'
+  }));
 };
 
 const obtenerReciboCompletoAutorizado = async ({
   usuario_id,
   recibo_id
 }) => {
-  const pool = await getConnection();
+  const reciboCompleto = await obtenerReciboCompletoPorId(recibo_id);
 
-  const accesoResult = await pool.request()
-    .input('usuario_id', sql.Int, usuario_id)
-    .input('recibo_id', sql.Int, recibo_id)
-    .query(`
-      SELECT TOP 1
-        r.recibo_id
-      FROM finance.Recibo r
-      INNER JOIN booking.Reserva res
-        ON res.reserva_id = r.reserva_id
-      INNER JOIN catalog.Inmueble i
-        ON i.inmueble_id = res.inmueble_id
-      WHERE r.recibo_id = @recibo_id
-        AND r.estado_recibo <> 'ANULADO'
-        AND (
-          res.inquilino_id = @usuario_id
+  if (!reciboCompleto) return null;
 
-          OR EXISTS (
-            SELECT 1
-            FROM catalog.Publicacion p
-            WHERE p.inmueble_id = i.inmueble_id
-              AND p.publicado_por_usuario_id = @usuario_id
-          )
-
-          OR EXISTS (
-            SELECT 1
-            FROM core.EmpresaSecretario es
-            WHERE es.empresa_id = i.empresa_id
-              AND es.secretario_usuario_id = @usuario_id
-              AND es.activo = 1
-          )
-
-          OR EXISTS (
-            SELECT 1
-            FROM auth.Usuario ua
-            INNER JOIN auth.UsuarioRol ur
-              ON ur.usuario_id = ua.usuario_id
-            INNER JOIN auth.Rol rol
-              ON rol.rol_id = ur.rol_id
-            WHERE ua.usuario_id = @usuario_id
-              AND ua.empresa_id = i.empresa_id
-              AND ua.activo = 1
-              AND ua.deleted_at IS NULL
-              AND rol.nombre = 'ADMIN'
-              AND rol.activo = 1
-          )
-        );
-    `);
-
-  const acceso = accesoResult.recordset[0];
-
-  if (!acceso) {
-    return null;
-  }
-
-  return obtenerReciboCompletoPorId(recibo_id);
+  return reciboCompleto;
 };
 
 module.exports = {
   obtenerReservaParaReciboGestion,
   obtenerVistaPreviaReciboReservaGestion,
   generarReciboReservaGestion,
-  obtenerReciboCompletoPorId,
   listarRecibosReservaAutorizados,
   obtenerReciboCompletoAutorizado
 };

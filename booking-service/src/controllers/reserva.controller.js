@@ -29,7 +29,8 @@ const {
   obtenerReservaParaCancelacionInquilinoMysqlModel,
   cancelarReservaPorInquilinoMysqlModel,
   buscarConflictosReservaMysqlModel,
-  crearSolicitudReservaMysqlModel
+  crearSolicitudReservaMysqlModel,
+  obtenerReservaResumenFinanceMysqlModel
 } = require('../models/reservaMysql.model');
 
 const {
@@ -2634,6 +2635,38 @@ const listarReservasPorRangoInterno = async (req, res) => {
   }
 };
 
+const obtenerReservaResumenFinanceInterno = async (req, res) => {
+  try {
+    const reservaId = Number(req.params.reserva_id);
+
+    if (!Number.isInteger(reservaId) || reservaId <= 0) {
+      return res.status(400).json({
+        mensaje: 'El ID de reserva no es válido.'
+      });
+    }
+
+    const reserva = await obtenerReservaResumenFinanceMysqlModel(reservaId);
+
+    if (!reserva) {
+      return res.status(404).json({
+        mensaje: 'Reserva no encontrada.'
+      });
+    }
+
+    return res.json({
+      mensaje: 'Reserva obtenida correctamente para finance-service.',
+      reserva
+    });
+  } catch (error) {
+    console.error('Error obteniendo reserva para finance-service:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno obteniendo reserva para finance-service.',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   solicitarReserva,
   obtenerMisSolicitudesReserva,
@@ -2652,5 +2685,6 @@ module.exports = {
   aprobarSolicitudExtension,
   rechazarSolicitudExtension,
   cancelarReservaInquilino,
-  listarReservasPorRangoInterno
+  listarReservasPorRangoInterno,
+  obtenerReservaResumenFinanceInterno
 };

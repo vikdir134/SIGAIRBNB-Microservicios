@@ -1915,6 +1915,41 @@ const crearSolicitudReservaMysqlModel = async ({
   }
 };
 
+const obtenerReservaResumenFinanceMysqlModel = async (reserva_id) => {
+  const pool = getMySqlPool();
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      reserva_id,
+      inmueble_id,
+      inquilino_id,
+      estado_reserva,
+      fecha_solicitud,
+      fecha_inicio,
+      fecha_fin,
+      renta_pactada_mensual,
+      monto_total_estimado,
+      deposito_garantia,
+      moneda,
+      observacion_inquilino,
+      observacion_gestor,
+      fecha_decision,
+      gestionado_por_usuario_id,
+      fecha_checkin,
+      fecha_checkout,
+      created_at,
+      updated_at
+    FROM reserva
+    WHERE reserva_id = ?
+    LIMIT 1;
+    `,
+    [reserva_id]
+  );
+
+  return rows[0] || null;
+};
+
 module.exports = {
   listarReservasPorRangoInternoMysqlModel,
   listarSolicitudesPorInquilinoMysqlModel,
@@ -1944,5 +1979,6 @@ module.exports = {
   obtenerReservaParaCancelacionInquilinoMysqlModel,
   cancelarReservaPorInquilinoMysqlModel,
   buscarConflictosReservaMysqlModel,
-  crearSolicitudReservaMysqlModel
+  crearSolicitudReservaMysqlModel,
+  obtenerReservaResumenFinanceMysqlModel
 };

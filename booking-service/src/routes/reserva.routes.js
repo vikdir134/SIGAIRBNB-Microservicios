@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const validateGatewayRequest = require('../middlewares/validateGatewayRequest');
+
 const {
   solicitarReserva,
   obtenerMisSolicitudesReserva,
@@ -19,7 +21,8 @@ const {
   aprobarSolicitudExtension,
   rechazarSolicitudExtension,
   cancelarReservaInquilino,
-  listarReservasPorRangoInterno
+  listarReservasPorRangoInterno,
+  obtenerReservaResumenFinanceInterno
 } = require('../controllers/reserva.controller');
 
 const {
@@ -39,6 +42,12 @@ router.get(
 router.get(
   '/internal/rango',
   listarReservasPorRangoInterno
+);
+
+router.get(
+  '/internal/:reserva_id/finance',
+  validateGatewayRequest,
+  obtenerReservaResumenFinanceInterno
 );
 
 router.patch(
