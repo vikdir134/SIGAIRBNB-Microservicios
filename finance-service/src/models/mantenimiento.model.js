@@ -1,288 +1,363 @@
-const { getConnection, sql } = require('../config/db');
+const { getPostgresPool } = require('../config/postgresDb');
+
+const {
+  listarInmueblesConRentaCatalog,
+  obtenerInmuebleConRentaCatalog
+} = require('../clients/catalog.client');
+
+const mapNumero = (valor) => Number(valor || 0);
 
 const listarCategoriasGasto = async () => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request().query(`
+  const result = await pool.query(`
     SELECT
       categoria_movimiento_id,
       nombre,
       naturaleza,
       descripcion,
-      activo
-    FROM finance.CategoriaMovimiento
-    WHERE naturaleza = 'GASTO'
-      AND activo = 1
+      activo,
+      created_at
+    FROM categoria_movimiento
+    WHERE activo = TRUE
+      AND UPPER(naturaleza) = 'EGRESO'
     ORDER BY nombre ASC;
   `);
 
-  return result.recordset;
+  return result.rows;
 };
 
 const listarCuentasMantenimientoPorEmpresa = async (empresa_id) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .query(`
-      SELECT
-        cb.cuenta_bancaria_id,
-        cb.empresa_id,
-        cb.nombre_cuenta,
-        cb.numero_cuenta,
-        cb.moneda,
-        cb.tipo_cuenta,
-        cb.saldo_actual,
-        b.nombre AS banco,
-        b.codigo AS codigo_banco
-      FROM finance.CuentaBancaria cb
-      INNER JOIN finance.Banco b
-        ON b.banco_id = cb.banco_id
-      WHERE cb.empresa_id = @empresa_id
-        AND cb.activa = 1
-        AND b.activo = 1
-      ORDER BY cb.nombre_cuenta ASC;
-    `);
+  const result = await pool.query(
+    `
+    SELECT
+      cb.cuenta_bancaria_id,
+      cb.empresa_id,
+      cb.banco_id,
+      b.nombre AS banco,
+      b.codigo AS codigo_banco,
+      cb.nombre_cuenta,
+      cb.numero_cuenta,
+      cb.cci,
+      cb.moneda,
+      cb.tipo_cuenta,
+      cb.saldo_inicial,
+      cb.saldo_actual,
+      cb.activa,
+      cb.created_at
+    FROM cuenta_bancaria cb
+    INNER JOIN banco b
+      ON b.banco_id = cb.banco_id
+    WHERE cb.empresa_id = $1
+      AND cb.activa = TRUE
+    ORDER BY cb.nombre_cuenta ASC;
+    `,
+    [empresa_id]
+  );
 
-  return result.recordset;
+  return result.rows.map((cuenta) => ({
+    ...cuenta,
+    saldo_inicial: mapNumero(cuenta.saldo_inicial),
+    saldo_actual: mapNumero(cuenta.saldo_actual)
+  }));
 };
 
 const listarInmueblesParaGasto = async (empresa_id) => {
-  const pool = await getConnection();
+  const inmuebles = await listarInmueblesConRentaCatalog(empresa_id);
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .query(`
-      SELECT
-        inmueble_id,
-        codigo,
-        nombre,
-        tipo_inmueble,
-        direccion_linea1,
-        distrito,
-        ciudad,
-        estado_operativo
-      FROM catalog.Inmueble
-      WHERE empresa_id = @empresa_id
-        AND activo = 1
-        AND deleted_at IS NULL
-      ORDER BY tipo_inmueble ASC, nombre ASC;
-    `);
-
-  return result.recordset;
+  return inmuebles.map((inmueble) => ({
+    inmueble_id: inmueble.inmueble_id,
+    empresa_id: inmueble.empresa_id,
+    codigo: inmueble.codigo,
+    nombre: inmueble.nombre,
+    tipo_inmueble: inmueble.tipo_inmueble,
+    direccion_linea1: inmueble.direccion_linea1,
+    numero: inmueble.numero,
+    distrito: inmueble.distrito,
+    ciudad: inmueble.ciudad,
+    departamento: inmueble.departamento
+  }));
 };
 
 const obtenerCuentaPorEmpresa = async (empresa_id, cuenta_bancaria_id) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .input('cuenta_bancaria_id', sql.Int, cuenta_bancaria_id)
-    .query(`
-      SELECT
-        cuenta_bancaria_id,
-        empresa_id,
-        saldo_actual,
-        moneda,
-        activa
-      FROM finance.CuentaBancaria
-      WHERE cuenta_bancaria_id = @cuenta_bancaria_id
-        AND empresa_id = @empresa_id
-        AND activa = 1;
-    `);
+  const result = await pool.query(
+    `
+    SELECT
+      cb.cuenta_bancaria_id,
+      cb.empresa_id,
+      cb.banco_id,
+      b.nombre AS banco,
+      b.codigo AS codigo_banco,
+      cb.nombre_cuenta,
+      cb.numero_cuenta,
+      cb.cci,
+      cb.moneda,
+      cb.tipo_cuenta,
+      cb.saldo_inicial,
+      cb.saldo_actual,
+      cb.activa,
+      cb.created_at
+    FROM cuenta_bancaria cb
+    INNER JOIN banco b
+      ON b.banco_id = cb.banco_id
+    WHERE cb.empresa_id = $1
+      AND cb.cuenta_bancaria_id = $2
+      AND cb.activa = TRUE;
+    `,
+    [empresa_id, cuenta_bancaria_id]
+  );
 
-  return result.recordset[0];
+  const cuenta = result.rows[0];
+
+  if (!cuenta) return null;
+
+  return {
+    ...cuenta,
+    saldo_inicial: mapNumero(cuenta.saldo_inicial),
+    saldo_actual: mapNumero(cuenta.saldo_actual)
+  };
 };
 
 const obtenerCategoriaGastoPorId = async (categoria_movimiento_id) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('categoria_movimiento_id', sql.Int, categoria_movimiento_id)
-    .query(`
-      SELECT
-        categoria_movimiento_id,
-        nombre,
-        naturaleza,
-        activo
-      FROM finance.CategoriaMovimiento
-      WHERE categoria_movimiento_id = @categoria_movimiento_id
-        AND naturaleza = 'GASTO'
-        AND activo = 1;
-    `);
+  const result = await pool.query(
+    `
+    SELECT
+      categoria_movimiento_id,
+      nombre,
+      naturaleza,
+      descripcion,
+      activo,
+      created_at
+    FROM categoria_movimiento
+    WHERE categoria_movimiento_id = $1
+      AND activo = TRUE
+      AND UPPER(naturaleza) = 'EGRESO';
+    `,
+    [categoria_movimiento_id]
+  );
 
-  return result.recordset[0];
+  return result.rows[0] || null;
 };
 
 const obtenerInmueblePorEmpresa = async (empresa_id, inmueble_id) => {
-  const pool = await getConnection();
+  const inmueble = await obtenerInmuebleConRentaCatalog(empresa_id, inmueble_id);
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .query(`
-      SELECT
-        inmueble_id,
-        empresa_id,
-        codigo,
-        nombre,
-        tipo_inmueble,
-        activo
-      FROM catalog.Inmueble
-      WHERE inmueble_id = @inmueble_id
-        AND empresa_id = @empresa_id
-        AND activo = 1
-        AND deleted_at IS NULL;
-    `);
+  if (!inmueble) return null;
 
-  return result.recordset[0];
+  return {
+    inmueble_id: inmueble.inmueble_id,
+    empresa_id: inmueble.empresa_id,
+    codigo: inmueble.codigo,
+    nombre: inmueble.nombre,
+    tipo_inmueble: inmueble.tipo_inmueble,
+    direccion_linea1: inmueble.direccion_linea1,
+    numero: inmueble.numero,
+    distrito: inmueble.distrito,
+    ciudad: inmueble.ciudad,
+    departamento: inmueble.departamento
+  };
 };
 
 const registrarGastoMantenimiento = async (empresa_id, data) => {
-  const pool = await getConnection();
-  const transaction = new sql.Transaction(pool);
+  const pool = getPostgresPool();
+  const client = await pool.connect();
 
   try {
-    await transaction.begin();
+    await client.query('BEGIN');
 
-    const cuentaResult = await new sql.Request(transaction)
-      .input('empresa_id', sql.Int, empresa_id)
-      .input('cuenta_bancaria_id', sql.Int, data.cuenta_bancaria_id)
-      .query(`
-        SELECT
-          cuenta_bancaria_id,
-          empresa_id,
-          saldo_actual,
-          moneda
-        FROM finance.CuentaBancaria
-        WHERE cuenta_bancaria_id = @cuenta_bancaria_id
-          AND empresa_id = @empresa_id
-          AND activa = 1;
-      `);
+    const cuentaResult = await client.query(
+      `
+      SELECT
+        cuenta_bancaria_id,
+        empresa_id,
+        saldo_actual
+      FROM cuenta_bancaria
+      WHERE empresa_id = $1
+        AND cuenta_bancaria_id = $2
+        AND activa = TRUE
+      FOR UPDATE;
+      `,
+      [empresa_id, data.cuenta_bancaria_id]
+    );
 
-    const cuenta = cuentaResult.recordset[0];
+    const cuenta = cuentaResult.rows[0];
 
     if (!cuenta) {
-      throw new Error('CUENTA_NO_VALIDA');
+      throw new Error('CUENTA_INVALIDA');
     }
 
-    const saldoAnterior = Number(cuenta.saldo_actual || 0);
-    const importe = Number(data.importe);
+    const saldoAnterior = mapNumero(cuenta.saldo_actual);
+    const importe = mapNumero(data.importe);
     const saldoPosterior = saldoAnterior - importe;
 
-    const insertResult = await new sql.Request(transaction)
-      .input('cuenta_bancaria_id', sql.Int, data.cuenta_bancaria_id)
-      .input('categoria_movimiento_id', sql.Int, data.categoria_movimiento_id)
-      .input('tipo_movimiento', sql.NVarChar(20), 'GASTO')
-      .input('inmueble_id', sql.Int, data.inmueble_id || null)
-      .input('reserva_id', sql.Int, data.reserva_id || null)
-      .input('fecha_movimiento', sql.DateTime2, data.fecha_movimiento)
-      .input('concepto', sql.NVarChar(200), data.concepto)
-      .input('descripcion', sql.NVarChar(500), data.descripcion || null)
-      .input('importe', sql.Decimal(14, 2), importe)
-      .input('saldo_anterior', sql.Decimal(14, 2), saldoAnterior)
-      .input('saldo_posterior', sql.Decimal(14, 2), saldoPosterior)
-      .input('referencia_externa', sql.NVarChar(150), data.referencia_externa || null)
-      .input('observaciones', sql.NVarChar(500), data.observaciones || null)
-      .query(`
-        INSERT INTO finance.MovimientoBancario (
-          cuenta_bancaria_id,
-          categoria_movimiento_id,
-          tipo_movimiento,
-          inmueble_id,
-          reserva_id,
-          recibo_id,
-          pago_id,
-          fecha_movimiento,
-          concepto,
-          descripcion,
-          importe,
-          saldo_anterior,
-          saldo_posterior,
-          referencia_externa,
-          observaciones
-        )
-        OUTPUT INSERTED.*
-        VALUES (
-          @cuenta_bancaria_id,
-          @categoria_movimiento_id,
-          @tipo_movimiento,
-          @inmueble_id,
-          @reserva_id,
-          NULL,
-          NULL,
-          @fecha_movimiento,
-          @concepto,
-          @descripcion,
-          @importe,
-          @saldo_anterior,
-          @saldo_posterior,
-          @referencia_externa,
-          @observaciones
-        );
-      `);
+    const movimientoResult = await client.query(
+      `
+      INSERT INTO movimiento_bancario (
+        cuenta_bancaria_id,
+        categoria_movimiento_id,
+        tipo_movimiento,
+        inmueble_id,
+        reserva_id,
+        recibo_id,
+        pago_id,
+        fecha_movimiento,
+        concepto,
+        descripcion,
+        importe,
+        saldo_anterior,
+        saldo_posterior,
+        referencia_externa,
+        observaciones,
+        created_at
+      )
+      VALUES (
+        $1, $2, 'EGRESO', $3, $4, NULL, NULL,
+        $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP
+      )
+      RETURNING
+        movimiento_bancario_id,
+        cuenta_bancaria_id,
+        categoria_movimiento_id,
+        tipo_movimiento,
+        inmueble_id,
+        reserva_id,
+        recibo_id,
+        pago_id,
+        fecha_movimiento,
+        concepto,
+        descripcion,
+        importe,
+        saldo_anterior,
+        saldo_posterior,
+        referencia_externa,
+        observaciones,
+        created_at;
+      `,
+      [
+        data.cuenta_bancaria_id,
+        data.categoria_movimiento_id,
+        data.inmueble_id || null,
+        data.reserva_id || null,
+        data.fecha_movimiento || new Date(),
+        data.concepto,
+        data.descripcion || null,
+        importe,
+        saldoAnterior,
+        saldoPosterior,
+        data.referencia_externa || null,
+        data.observaciones || null
+      ]
+    );
 
-    await new sql.Request(transaction)
-      .input('cuenta_bancaria_id', sql.Int, data.cuenta_bancaria_id)
-      .input('saldo_actual', sql.Decimal(14, 2), saldoPosterior)
-      .query(`
-        UPDATE finance.CuentaBancaria
-        SET saldo_actual = @saldo_actual
-        WHERE cuenta_bancaria_id = @cuenta_bancaria_id;
-      `);
+    await client.query(
+      `
+      UPDATE cuenta_bancaria
+      SET saldo_actual = $1
+      WHERE cuenta_bancaria_id = $2;
+      `,
+      [saldoPosterior, data.cuenta_bancaria_id]
+    );
 
-    await transaction.commit();
+    await client.query('COMMIT');
 
-    return insertResult.recordset[0];
+    const movimiento = movimientoResult.rows[0];
+
+    return {
+      ...movimiento,
+      importe: mapNumero(movimiento.importe),
+      saldo_anterior: mapNumero(movimiento.saldo_anterior),
+      saldo_posterior: mapNumero(movimiento.saldo_posterior)
+    };
   } catch (error) {
-    await transaction.rollback();
+    await client.query('ROLLBACK');
     throw error;
+  } finally {
+    client.release();
   }
 };
 
 const listarGastosMantenimiento = async (empresa_id) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .query(`
-      SELECT
-        mb.movimiento_bancario_id,
-        mb.fecha_movimiento,
-        mb.concepto,
-        mb.descripcion,
-        mb.importe,
-        mb.referencia_externa,
-        mb.observaciones,
-        mb.saldo_anterior,
-        mb.saldo_posterior,
+  const result = await pool.query(
+    `
+    SELECT
+      mb.movimiento_bancario_id,
+      mb.cuenta_bancaria_id,
+      mb.categoria_movimiento_id,
+      mb.tipo_movimiento,
+      mb.inmueble_id,
+      mb.reserva_id,
+      mb.recibo_id,
+      mb.pago_id,
+      mb.fecha_movimiento,
+      mb.concepto,
+      mb.descripcion,
+      mb.importe,
+      mb.saldo_anterior,
+      mb.saldo_posterior,
+      mb.referencia_externa,
+      mb.observaciones,
+      mb.created_at,
 
-        cm.categoria_movimiento_id,
-        cm.nombre AS categoria,
+      cm.nombre AS categoria,
+      cm.naturaleza,
 
-        cb.cuenta_bancaria_id,
-        cb.nombre_cuenta,
-        cb.numero_cuenta,
-        cb.moneda,
+      cb.empresa_id,
+      cb.nombre_cuenta,
+      cb.numero_cuenta,
+      cb.moneda,
+      b.nombre AS banco
+    FROM movimiento_bancario mb
+    INNER JOIN categoria_movimiento cm
+      ON cm.categoria_movimiento_id = mb.categoria_movimiento_id
+    INNER JOIN cuenta_bancaria cb
+      ON cb.cuenta_bancaria_id = mb.cuenta_bancaria_id
+    INNER JOIN banco b
+      ON b.banco_id = cb.banco_id
+    WHERE cb.empresa_id = $1
+      AND UPPER(mb.tipo_movimiento) = 'EGRESO'
+    ORDER BY mb.fecha_movimiento DESC, mb.movimiento_bancario_id DESC;
+    `,
+    [empresa_id]
+  );
 
-        i.inmueble_id,
-        i.codigo AS codigo_inmueble,
-        i.nombre AS inmueble,
-        i.tipo_inmueble
-      FROM finance.MovimientoBancario mb
-      INNER JOIN finance.CategoriaMovimiento cm
-        ON cm.categoria_movimiento_id = mb.categoria_movimiento_id
-      INNER JOIN finance.CuentaBancaria cb
-        ON cb.cuenta_bancaria_id = mb.cuenta_bancaria_id
-      LEFT JOIN catalog.Inmueble i
-        ON i.inmueble_id = mb.inmueble_id
-      WHERE cb.empresa_id = @empresa_id
-        AND mb.tipo_movimiento = 'GASTO'
-        AND cm.naturaleza = 'GASTO'
-      ORDER BY mb.fecha_movimiento DESC, mb.movimiento_bancario_id DESC;
-    `);
+  let inmueblesMap = new Map();
 
-  return result.recordset;
+  try {
+    const inmuebles = await listarInmueblesConRentaCatalog(empresa_id);
+
+    inmueblesMap = new Map(
+      inmuebles.map((inmueble) => [
+        Number(inmueble.inmueble_id),
+        inmueble
+      ])
+    );
+  } catch (error) {
+    console.error('No se pudieron obtener inmuebles desde catalog-service:', error.message);
+  }
+
+  return result.rows.map((gasto) => {
+    const inmueble = gasto.inmueble_id
+      ? inmueblesMap.get(Number(gasto.inmueble_id))
+      : null;
+
+    return {
+      ...gasto,
+      importe: mapNumero(gasto.importe),
+      saldo_anterior: mapNumero(gasto.saldo_anterior),
+      saldo_posterior: mapNumero(gasto.saldo_posterior),
+      inmueble_codigo: inmueble?.codigo || null,
+      inmueble_nombre: inmueble?.nombre || null,
+      inmueble: inmueble?.nombre || null
+    };
+  });
 };
 
 module.exports = {
