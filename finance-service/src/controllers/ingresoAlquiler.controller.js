@@ -1,4 +1,6 @@
-const { getConnection, sql } = require('../config/db');
+const {
+  obtenerEmpresasSecretarioUsuario
+} = require('../clients/auth.client');
 
 const {
   listarCategoriasIngreso,
@@ -15,62 +17,75 @@ const {
   isDateNotAbsurd
 } = require('../utils/dateHelpers');
 
-const obtenerUsuarioId = (req) => {
-  return req.usuario?.usuario_id || req.usuario?.id;
-};
-
 const obtenerRolesUsuario = (req) => {
-  const roles = req.usuario?.roles || [];
+  const usuario = req.usuario || req.user || {};
 
-  if (Array.isArray(roles)) {
-    return roles.map((rol) => String(rol).toUpperCase());
+  if (Array.isArray(usuario.roles)) {
+    return usuario.roles.map((rol) => String(rol).toUpperCase());
+  }
+
+  if (usuario.rol) {
+    return [String(usuario.rol).toUpperCase()];
   }
 
   return [];
 };
 
+const obtenerUsuarioId = (req) => {
+  const usuario = req.usuario || req.user || {};
+
+  return Number(
+    usuario.usuario_id ||
+    usuario.id ||
+    usuario.user_id ||
+    0
+  );
+};
+
+const obtenerEmpresaIdUsuario = (req) => {
+  const usuario = req.usuario || req.user || {};
+
+  return Number(
+    usuario.empresa_id ||
+    usuario.empresaId ||
+    0
+  );
+};
+
 const obtenerEmpresaGestionada = async (req) => {
-  const usuario_id = obtenerUsuarioId(req);
-  const empresaToken = req.usuario?.empresa_id;
   const roles = obtenerRolesUsuario(req);
+  const empresaIdDirecto = obtenerEmpresaIdUsuario(req);
+  const usuarioId = obtenerUsuarioId(req);
 
-  if (!usuario_id) {
-    return null;
-  }
-
-  /*
-    Si es ADMIN, trabaja con su propia empresa.
-  */
   if (roles.includes('ADMIN')) {
-    return empresaToken || null;
+    if (!empresaIdDirecto) {
+      throw new Error('EMPRESA_NO_DETECTADA');
+    }
+
+    return empresaIdDirecto;
   }
 
-  /*
-    Si es SECRETARIO, debe trabajar con la empresa asignada
-    en core.EmpresaSecretario, no con su empresa propia.
-  */
   if (roles.includes('SECRETARIO')) {
-    const pool = await getConnection();
+    if (empresaIdDirecto) {
+      return empresaIdDirecto;
+    }
 
-    const result = await pool.request()
-      .input('secretario_usuario_id', sql.Int, usuario_id)
-      .query(`
-        SELECT TOP 1
-          es.empresa_id
-        FROM core.EmpresaSecretario es
-        INNER JOIN core.Empresa e
-          ON e.empresa_id = es.empresa_id
-        WHERE es.secretario_usuario_id = @secretario_usuario_id
-          AND es.activo = 1
-          AND e.activo = 1
-          AND e.deleted_at IS NULL
-        ORDER BY es.fecha_asignacion DESC;
-      `);
+    const empresas = await obtenerEmpresasSecretarioUsuario(usuarioId);
 
-    return result.recordset[0]?.empresa_id || null;
+    const empresa = empresas.find((item) => item.activo !== false) || empresas[0];
+
+    if (!empresa) {
+      throw new Error('EMPRESA_NO_DETECTADA');
+    }
+
+    return Number(empresa.empresa_id);
   }
 
-  return empresaToken || null;
+  if (empresaIdDirecto) {
+    return empresaIdDirecto;
+  }
+
+  throw new Error('EMPRESA_NO_DETECTADA');
 };
 
 const obtenerDatosFormularioIngreso = async (req, res) => {
