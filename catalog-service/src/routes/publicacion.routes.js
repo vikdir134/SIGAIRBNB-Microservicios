@@ -13,7 +13,10 @@ const {
   eliminarBorradorPublicacionGestion,
   eliminarPublicacionGestion,
   obtenerPublicacionPorInmuebleInterno,
-  obtenerPublicacionReservableInterno
+  obtenerPublicacionReservableInterno,
+  listarInmueblesConRentaCatalogoInterno,
+  obtenerInmuebleConRentaCatalogoInterno,
+  actualizarRentaInmuebleCatalogoInterno
 } = require('../controllers/publicacion.controller');
 
 const {
@@ -80,6 +83,24 @@ router.get(
   '/internal/:publicacion_id/reservable',
   validateGatewayRequest,
   obtenerPublicacionReservableInterno
+);
+
+router.get(
+  '/internal/empresas/:empresa_id/inmuebles-renta',
+  validateGatewayRequest,
+  listarInmueblesConRentaCatalogoInterno
+);
+
+router.get(
+  '/internal/empresas/:empresa_id/inmuebles/:inmueble_id/renta',
+  validateGatewayRequest,
+  obtenerInmuebleConRentaCatalogoInterno
+);
+
+router.patch(
+  '/internal/inmuebles/:inmueble_id/renta',
+  validateGatewayRequest,
+  actualizarRentaInmuebleCatalogoInterno
 );
 
 /*

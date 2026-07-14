@@ -802,6 +802,129 @@ const obtenerPublicacionReservablePorIdInterno = async (publicacion_id) => {
   return result.recordset[0] || null;
 };
 
+const listarInmueblesConRentaInterno = async (empresa_id) => {
+  const pool = await getConnection();
+
+  const result = await pool.request()
+    .input('empresa_id', sql.Int, empresa_id)
+    .query(`
+      SELECT
+        i.inmueble_id,
+        i.empresa_id,
+        i.codigo,
+        i.nombre,
+        i.tipo_inmueble,
+        i.subtipo_unidad,
+        i.direccion_linea1,
+        i.numero,
+        i.distrito,
+        i.ciudad,
+        i.provincia,
+        i.departamento,
+
+        p.publicacion_id,
+        p.titulo AS titulo_publicacion,
+        p.precio_publicado_mensual AS renta_base_mensual
+      FROM catalog.Inmueble i
+      OUTER APPLY (
+        SELECT TOP 1
+          p2.publicacion_id,
+          p2.titulo,
+          p2.precio_publicado_mensual
+        FROM catalog.Publicacion p2
+        WHERE p2.inmueble_id = i.inmueble_id
+          AND p2.estado_publicacion = 'PUBLICADA'
+        ORDER BY p2.publicacion_id DESC
+      ) p
+      WHERE i.empresa_id = @empresa_id
+        AND i.activo = 1
+        AND i.deleted_at IS NULL
+      ORDER BY i.nombre ASC;
+    `);
+
+  return result.recordset;
+};
+
+const obtenerInmuebleConRentaInterno = async (empresa_id, inmueble_id) => {
+  const pool = await getConnection();
+
+  const result = await pool.request()
+    .input('empresa_id', sql.Int, empresa_id)
+    .input('inmueble_id', sql.Int, inmueble_id)
+    .query(`
+      SELECT
+        i.inmueble_id,
+        i.empresa_id,
+        i.codigo,
+        i.nombre,
+        i.tipo_inmueble,
+        i.subtipo_unidad,
+        i.direccion_linea1,
+        i.numero,
+        i.distrito,
+        i.ciudad,
+        i.provincia,
+        i.departamento,
+
+        p.publicacion_id,
+        p.titulo AS titulo_publicacion,
+        p.precio_publicado_mensual AS renta_base_mensual
+      FROM catalog.Inmueble i
+      OUTER APPLY (
+        SELECT TOP 1
+          p2.publicacion_id,
+          p2.titulo,
+          p2.precio_publicado_mensual
+        FROM catalog.Publicacion p2
+        WHERE p2.inmueble_id = i.inmueble_id
+          AND p2.estado_publicacion = 'PUBLICADA'
+        ORDER BY p2.publicacion_id DESC
+      ) p
+      WHERE i.empresa_id = @empresa_id
+        AND i.inmueble_id = @inmueble_id
+        AND i.activo = 1
+        AND i.deleted_at IS NULL;
+    `);
+
+  return result.recordset[0] || null;
+};
+
+const actualizarRentaInmuebleInterno = async (inmueble_id, nueva_renta) => {
+  const pool = await getConnection();
+
+  await pool.request()
+    .input('inmueble_id', sql.Int, inmueble_id)
+    .input('nueva_renta', sql.Decimal(12, 2), nueva_renta)
+    .query(`
+      UPDATE catalog.Publicacion
+      SET precio_publicado_mensual = @nueva_renta
+      WHERE inmueble_id = @inmueble_id
+        AND estado_publicacion = 'PUBLICADA';
+    `);
+
+  const result = await pool.request()
+    .input('inmueble_id', sql.Int, inmueble_id)
+    .query(`
+      SELECT TOP 1
+        i.inmueble_id,
+        i.empresa_id,
+        i.codigo,
+        i.nombre,
+        i.tipo_inmueble,
+        p.publicacion_id,
+        p.titulo AS titulo_publicacion,
+        p.precio_publicado_mensual AS renta_base_mensual
+      FROM catalog.Inmueble i
+      LEFT JOIN catalog.Publicacion p
+        ON p.inmueble_id = i.inmueble_id
+      WHERE i.inmueble_id = @inmueble_id
+        AND p.estado_publicacion = 'PUBLICADA'
+      ORDER BY p.publicacion_id DESC;
+    `);
+
+  return result.recordset[0] || null;
+};
+
 module.exports = {
   listarPublicaciones,
   obtenerPublicacionPorId,
@@ -817,5 +940,8 @@ module.exports = {
   eliminarBorradorPublicacionPorId,
   eliminarPublicacionPorId,
   obtenerResumenPublicacionPorInmueble,
-  obtenerPublicacionReservablePorIdInterno
+  obtenerPublicacionReservablePorIdInterno,
+  listarInmueblesConRentaInterno,
+  obtenerInmuebleConRentaInterno,
+  actualizarRentaInmuebleInterno
 };

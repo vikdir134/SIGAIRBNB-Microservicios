@@ -13,7 +13,10 @@ const {
   eliminarBorradorPublicacionPorId,
   eliminarPublicacionPorId,
   obtenerResumenPublicacionPorInmueble,
-  obtenerPublicacionReservablePorIdInterno
+  obtenerPublicacionReservablePorIdInterno,
+  listarInmueblesConRentaInterno,
+  obtenerInmuebleConRentaInterno,
+  actualizarRentaInmuebleInterno
 } = require('../models/publicacion.model');
 
 const {
@@ -778,6 +781,98 @@ const obtenerPublicacionReservableInterno = async (req, res) => {
   }
 };
 
+const listarInmueblesConRentaCatalogoInterno = async (req, res) => {
+  try {
+    const empresaId = Number(req.params.empresa_id);
+
+    if (Number.isNaN(empresaId) || empresaId <= 0) {
+      return res.status(400).json({ mensaje: 'El ID de empresa no es válido' });
+    }
+
+    const inmuebles = await listarInmueblesConRentaInterno(empresaId);
+
+    return res.json({
+      mensaje: 'Inmuebles con renta obtenidos correctamente',
+      total: inmuebles.length,
+      inmuebles
+    });
+  } catch (error) {
+    console.error('Error interno al listar inmuebles con renta:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al listar inmuebles con renta',
+      error: error.message
+    });
+  }
+};
+
+const obtenerInmuebleConRentaCatalogoInterno = async (req, res) => {
+  try {
+    const empresaId = Number(req.params.empresa_id);
+    const inmuebleId = Number(req.params.inmueble_id);
+
+    if (
+      Number.isNaN(empresaId) ||
+      empresaId <= 0 ||
+      Number.isNaN(inmuebleId) ||
+      inmuebleId <= 0
+    ) {
+      return res.status(400).json({ mensaje: 'Los IDs enviados no son válidos' });
+    }
+
+    const inmueble = await obtenerInmuebleConRentaInterno(empresaId, inmuebleId);
+
+    if (!inmueble) {
+      return res.status(404).json({ mensaje: 'Inmueble no encontrado' });
+    }
+
+    return res.json({
+      mensaje: 'Inmueble con renta obtenido correctamente',
+      inmueble
+    });
+  } catch (error) {
+    console.error('Error interno al obtener inmueble con renta:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al obtener inmueble con renta',
+      error: error.message
+    });
+  }
+};
+
+const actualizarRentaInmuebleCatalogoInterno = async (req, res) => {
+  try {
+    const inmuebleId = Number(req.params.inmueble_id);
+    const nuevaRenta = Number(req.body?.nueva_renta);
+
+    if (
+      Number.isNaN(inmuebleId) ||
+      inmuebleId <= 0 ||
+      Number.isNaN(nuevaRenta) ||
+      nuevaRenta < 0
+    ) {
+      return res.status(400).json({ mensaje: 'Datos de renta no válidos' });
+    }
+
+    const inmueble = await actualizarRentaInmuebleInterno(
+      inmuebleId,
+      nuevaRenta
+    );
+
+    return res.json({
+      mensaje: 'Renta del inmueble actualizada correctamente',
+      inmueble
+    });
+  } catch (error) {
+    console.error('Error interno al actualizar renta del inmueble:', error);
+
+    return res.status(500).json({
+      mensaje: 'Error interno al actualizar renta del inmueble',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   listarPublicacionesPublicas,
   obtenerDetallePublicacion,
@@ -788,5 +883,8 @@ module.exports = {
   eliminarBorradorPublicacionGestion,
   eliminarPublicacionGestion,
   obtenerPublicacionPorInmuebleInterno,
-  obtenerPublicacionReservableInterno
+  obtenerPublicacionReservableInterno,
+  listarInmueblesConRentaCatalogoInterno,
+  obtenerInmuebleConRentaCatalogoInterno,
+  actualizarRentaInmuebleCatalogoInterno
 };

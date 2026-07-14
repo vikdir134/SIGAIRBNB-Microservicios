@@ -1,403 +1,388 @@
-const sql = require('mssql');
-const { getConnection } = require('../config/db');
+const { getPostgresPool } = require('../config/postgresDb');
+
+const {
+  listarInmueblesConRentaCatalog,
+  obtenerInmuebleConRentaCatalog,
+  actualizarRentaInmuebleCatalog
+} = require('../clients/catalog.client');
 
 const redondear2 = (numero) => {
   return Math.round((Number(numero) + Number.EPSILON) * 100) / 100;
 };
 
-const listarIPC = async () => {
-  const pool = await getConnection();
+const fechaYYYYMMDD = (fecha = new Date()) => {
+  const d = new Date(fecha);
+  const anio = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
 
-  const result = await pool.request().query(`
-    SELECT 
+  return `${anio}-${mes}-${dia}`;
+};
+
+const mapIPC = (row) => {
+  if (!row) return null;
+
+  return {
+    ...row,
+    porcentaje_anual: Number(row.porcentaje_anual || 0)
+  };
+};
+
+const mapTarifa = (row) => {
+  if (!row) return null;
+
+  return {
+    ...row,
+    renta_base_mensual: Number(row.renta_base_mensual || 0),
+    porcentaje_ipc_aplicado: Number(row.porcentaje_ipc_aplicado || 0),
+    monto_incremento: Number(row.monto_incremento || 0)
+  };
+};
+
+const listarIPC = async () => {
+  const pool = getPostgresPool();
+
+  const result = await pool.query(`
+    SELECT
       indice_ipc_id,
       anio,
       porcentaje_anual,
       fecha_publicacion,
       activo,
       created_at
-    FROM finance.IndiceIPC
-    WHERE activo = 1
-    ORDER BY anio DESC
+    FROM indice_ipc
+    ORDER BY anio DESC;
   `);
 
-  return result.recordset;
+  return result.rows.map(mapIPC);
 };
 
 const buscarIPCPorAnio = async (anio) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('anio', sql.Int, anio)
-    .query(`
-      SELECT TOP 1
-        indice_ipc_id,
-        anio,
-        porcentaje_anual,
-        fecha_publicacion,
-        activo,
-        created_at
-      FROM finance.IndiceIPC
-      WHERE anio = @anio
-        AND activo = 1
-    `);
+  const result = await pool.query(
+    `
+    SELECT
+      indice_ipc_id,
+      anio,
+      porcentaje_anual,
+      fecha_publicacion,
+      activo,
+      created_at
+    FROM indice_ipc
+    WHERE anio = $1
+      AND activo = TRUE;
+    `,
+    [anio]
+  );
 
-  return result.recordset[0] || null;
+  return mapIPC(result.rows[0]);
+};
+
+const buscarIPCPorId = async (indice_ipc_id) => {
+  const pool = getPostgresPool();
+
+  const result = await pool.query(
+    `
+    SELECT
+      indice_ipc_id,
+      anio,
+      porcentaje_anual,
+      fecha_publicacion,
+      activo,
+      created_at
+    FROM indice_ipc
+    WHERE indice_ipc_id = $1
+      AND activo = TRUE;
+    `,
+    [indice_ipc_id]
+  );
+
+  return mapIPC(result.rows[0]);
 };
 
 const registrarIPC = async ({ anio, porcentaje_anual, fecha_publicacion }) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('anio', sql.Int, anio)
-    .input('porcentaje_anual', sql.Decimal(6, 3), porcentaje_anual)
-    .input('fecha_publicacion', sql.Date, fecha_publicacion || null)
-    .query(`
-      INSERT INTO finance.IndiceIPC (
-        anio,
-        porcentaje_anual,
-        fecha_publicacion
-      )
-      OUTPUT INSERTED.*
-      VALUES (
-        @anio,
-        @porcentaje_anual,
-        @fecha_publicacion
-      )
-    `);
+  const result = await pool.query(
+    `
+    INSERT INTO indice_ipc (
+      anio,
+      porcentaje_anual,
+      fecha_publicacion,
+      activo,
+      created_at
+    )
+    VALUES ($1, $2, $3, TRUE, CURRENT_TIMESTAMP)
+    RETURNING
+      indice_ipc_id,
+      anio,
+      porcentaje_anual,
+      fecha_publicacion,
+      activo,
+      created_at;
+    `,
+    [
+      anio,
+      porcentaje_anual,
+      fecha_publicacion || null
+    ]
+  );
 
-  return result.recordset[0];
+  return mapIPC(result.rows[0]);
 };
 
 const listarInmueblesConRenta = async (empresa_id) => {
-  const pool = await getConnection();
+  const inmuebles = await listarInmueblesConRentaCatalog(empresa_id);
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .query(`
-      SELECT
-        i.inmueble_id,
-        i.empresa_id,
-        i.codigo,
-        i.tipo_inmueble,
-        i.nombre,
-        i.direccion_linea1,
-        i.distrito,
-        i.ciudad,
-        i.renta_base_mensual,
-        i.moneda,
-        i.estado_operativo,
-        i.activo,
-        p.publicacion_id,
-        p.titulo AS titulo_publicacion,
-        p.precio_publicado_mensual,
-        p.estado_publicacion
-      FROM catalog.Inmueble i
-      LEFT JOIN catalog.Publicacion p
-        ON p.inmueble_id = i.inmueble_id
-      WHERE i.empresa_id = @empresa_id
-        AND i.activo = 1
-        AND i.renta_base_mensual IS NOT NULL
-      ORDER BY i.tipo_inmueble, i.nombre
-    `);
-
-  return result.recordset;
+  return inmuebles.map((inmueble) => ({
+    ...inmueble,
+    renta_base_mensual: Number(inmueble.renta_base_mensual || 0)
+  }));
 };
 
-const obtenerInmueblePorId = async (empresa_id, inmueble_id, transaction = null) => {
-  const request = transaction
-    ? new sql.Request(transaction)
-    : (await getConnection()).request();
+const obtenerInmueblePorId = async (empresa_id, inmueble_id) => {
+  const inmueble = await obtenerInmuebleConRentaCatalog(
+    empresa_id,
+    inmueble_id
+  );
 
-  const result = await request
-    .input('empresa_id', sql.Int, empresa_id)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .query(`
-      SELECT TOP 1
-        inmueble_id,
-        empresa_id,
-        codigo,
-        tipo_inmueble,
-        nombre,
-        direccion_linea1,
-        distrito,
-        ciudad,
-        renta_base_mensual,
-        moneda,
-        estado_operativo,
-        activo
-      FROM catalog.Inmueble
-      WHERE empresa_id = @empresa_id
-        AND inmueble_id = @inmueble_id
-        AND activo = 1
-    `);
+  if (!inmueble) return null;
 
-  return result.recordset[0] || null;
+  return {
+    ...inmueble,
+    renta_base_mensual: Number(inmueble.renta_base_mensual || 0)
+  };
 };
 
 const verificarAplicacionIPC = async (inmueble_id, indice_ipc_id) => {
-  const pool = await getConnection();
+  const pool = getPostgresPool();
 
-  const result = await pool.request()
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('indice_ipc_id', sql.Int, indice_ipc_id)
-    .query(`
-      SELECT TOP 1
-        tarifa_inmueble_id,
-        inmueble_id,
-        indice_ipc_id,
-        vigencia_desde,
-        vigencia_hasta,
-        renta_base_mensual,
-        porcentaje_ipc_aplicado,
-        monto_incremento,
-        motivo,
-        aplicado_por_usuario_id,
-        created_at
-      FROM finance.TarifaInmueble
-      WHERE inmueble_id = @inmueble_id
-        AND indice_ipc_id = @indice_ipc_id
-    `);
+  const ipc = await buscarIPCPorId(indice_ipc_id);
 
-  return result.recordset[0] || null;
+  if (!ipc) return null;
+
+  const result = await pool.query(
+    `
+    SELECT
+      tarifa_inmueble_id,
+      inmueble_id,
+      vigencia_desde,
+      vigencia_hasta,
+      renta_base_mensual,
+      porcentaje_ipc_aplicado,
+      monto_incremento,
+      motivo,
+      aplicado_por_usuario_id,
+      created_at
+    FROM tarifa_inmueble
+    WHERE inmueble_id = $1
+      AND porcentaje_ipc_aplicado = $2
+      AND motivo ILIKE $3
+    ORDER BY created_at DESC
+    LIMIT 1;
+    `,
+    [
+      inmueble_id,
+      ipc.porcentaje_anual,
+      `%IPC ${ipc.anio}%`
+    ]
+  );
+
+  return mapTarifa(result.rows[0]);
 };
 
-const cerrarTarifaVigente = async (inmueble_id, fecha_cierre, transaction) => {
-  const request = new sql.Request(transaction);
-
-  await request
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('fecha_cierre', sql.Date, fecha_cierre)
-    .query(`
-      UPDATE finance.TarifaInmueble
-      SET vigencia_hasta = @fecha_cierre
-      WHERE inmueble_id = @inmueble_id
-        AND vigencia_hasta IS NULL
-    `);
+const cerrarTarifaVigente = async (client, inmueble_id, fecha_cierre) => {
+  await client.query(
+    `
+    UPDATE tarifa_inmueble
+    SET vigencia_hasta = $2
+    WHERE inmueble_id = $1
+      AND vigencia_hasta IS NULL;
+    `,
+    [
+      inmueble_id,
+      fecha_cierre
+    ]
+  );
 };
 
-const crearTarifaInmueble = async ({
-  inmueble_id,
-  indice_ipc_id,
-  vigencia_desde,
-  renta_base_mensual,
-  porcentaje_ipc_aplicado,
-  monto_incremento,
-  motivo,
-  aplicado_por_usuario_id
-}, transaction) => {
-  const request = new sql.Request(transaction);
-
-  const result = await request
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('indice_ipc_id', sql.Int, indice_ipc_id)
-    .input('vigencia_desde', sql.Date, vigencia_desde)
-    .input('renta_base_mensual', sql.Decimal(12, 2), renta_base_mensual)
-    .input('porcentaje_ipc_aplicado', sql.Decimal(6, 3), porcentaje_ipc_aplicado)
-    .input('monto_incremento', sql.Decimal(12, 2), monto_incremento)
-    .input('motivo', sql.NVarChar(300), motivo || null)
-    .input('aplicado_por_usuario_id', sql.Int, aplicado_por_usuario_id || null)
-    .query(`
-      INSERT INTO finance.TarifaInmueble (
-        inmueble_id,
-        indice_ipc_id,
-        vigencia_desde,
-        vigencia_hasta,
-        renta_base_mensual,
-        porcentaje_ipc_aplicado,
-        monto_incremento,
-        motivo,
-        aplicado_por_usuario_id
-      )
-      OUTPUT INSERTED.*
-      VALUES (
-        @inmueble_id,
-        @indice_ipc_id,
-        @vigencia_desde,
-        NULL,
-        @renta_base_mensual,
-        @porcentaje_ipc_aplicado,
-        @monto_incremento,
-        @motivo,
-        @aplicado_por_usuario_id
-      )
-    `);
-
-  return result.recordset[0];
-};
-
-const actualizarRentaBaseInmueble = async (
-  empresa_id,
-  inmueble_id,
-  nueva_renta,
-  transaction
+const crearTarifaInmueble = async (
+  client,
+  {
+    inmueble_id,
+    vigencia_desde,
+    renta_base_mensual,
+    porcentaje_ipc_aplicado,
+    monto_incremento,
+    motivo,
+    aplicado_por_usuario_id
+  }
 ) => {
-  const request = new sql.Request(transaction);
+  const result = await client.query(
+    `
+    INSERT INTO tarifa_inmueble (
+      inmueble_id,
+      vigencia_desde,
+      vigencia_hasta,
+      renta_base_mensual,
+      porcentaje_ipc_aplicado,
+      monto_incremento,
+      motivo,
+      aplicado_por_usuario_id,
+      created_at
+    )
+    VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+    RETURNING
+      tarifa_inmueble_id,
+      inmueble_id,
+      vigencia_desde,
+      vigencia_hasta,
+      renta_base_mensual,
+      porcentaje_ipc_aplicado,
+      monto_incremento,
+      motivo,
+      aplicado_por_usuario_id,
+      created_at;
+    `,
+    [
+      inmueble_id,
+      vigencia_desde,
+      renta_base_mensual,
+      porcentaje_ipc_aplicado,
+      monto_incremento,
+      motivo,
+      aplicado_por_usuario_id || null
+    ]
+  );
 
-  await request
-    .input('empresa_id', sql.Int, empresa_id)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('nueva_renta', sql.Decimal(12, 2), nueva_renta)
-    .query(`
-      UPDATE catalog.Inmueble
-      SET renta_base_mensual = @nueva_renta,
-          updated_at = SYSDATETIME()
-      WHERE empresa_id = @empresa_id
-        AND inmueble_id = @inmueble_id
-    `);
-};
-
-const actualizarPrecioPublicacion = async (
-  inmueble_id,
-  nueva_renta,
-  transaction
-) => {
-  const request = new sql.Request(transaction);
-
-  await request
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .input('nueva_renta', sql.Decimal(12, 2), nueva_renta)
-    .query(`
-      UPDATE catalog.Publicacion
-      SET precio_publicado_mensual = @nueva_renta,
-          updated_at = SYSDATETIME()
-      WHERE inmueble_id = @inmueble_id
-    `);
+  return mapTarifa(result.rows[0]);
 };
 
 const aplicarIPCMasivo = async ({
   empresa_id,
   usuario_id,
+  usuario_gestor_id,
+  aplicado_por_usuario_id,
   ipc,
   inmueble_ids,
-  aplicar_a_publicacion,
   motivo
 }) => {
-  const pool = await getConnection();
-  const transaction = new sql.Transaction(pool);
+  const pool = getPostgresPool();
+  const client = await pool.connect();
 
-  await transaction.begin();
+  const actualizados = [];
+  const fechaAplicacion = fechaYYYYMMDD();
+  const aplicadoPor =
+    aplicado_por_usuario_id ||
+    usuario_id ||
+    usuario_gestor_id ||
+    null;
 
   try {
-    const actualizados = [];
-    const fechaAplicacion = new Date();
+    await client.query('BEGIN');
 
     for (const inmueble_id of inmueble_ids) {
       const inmueble = await obtenerInmueblePorId(
         empresa_id,
-        inmueble_id,
-        transaction
+        inmueble_id
       );
 
       if (!inmueble) {
-        throw new Error(`El inmueble ${inmueble_id} no existe o no pertenece a la empresa.`);
+        throw new Error(`No se encontró el inmueble ${inmueble_id}`);
       }
 
       const rentaActual = Number(inmueble.renta_base_mensual || 0);
-
-      if (rentaActual <= 0) {
-        throw new Error(`El inmueble ${inmueble_id} no tiene una renta base mensual válida.`);
-      }
-
-      const porcentajeIPC = Number(ipc.porcentaje_anual);
+      const porcentajeIPC = Number(ipc.porcentaje_anual || 0);
       const montoIncremento = redondear2(rentaActual * (porcentajeIPC / 100));
       const nuevaRenta = redondear2(rentaActual + montoIncremento);
 
+      const motivoFinal = motivo
+        ? `${motivo} - IPC ${ipc.anio}`
+        : `Aplicación de IPC ${ipc.anio}`;
+
       await cerrarTarifaVigente(
+        client,
         inmueble_id,
-        fechaAplicacion,
-        transaction
+        fechaAplicacion
       );
 
-      const motivoFinal = motivo
-        ? `IPC ${ipc.anio} - ${motivo}`
-        : `IPC ${ipc.anio} - Actualización anual de renta`;
-
       const tarifa = await crearTarifaInmueble(
+        client,
         {
           inmueble_id,
-          indice_ipc_id: ipc.indice_ipc_id,
           vigencia_desde: fechaAplicacion,
           renta_base_mensual: nuevaRenta,
           porcentaje_ipc_aplicado: porcentajeIPC,
           monto_incremento: montoIncremento,
           motivo: motivoFinal,
-          aplicado_por_usuario_id: usuario_id
-        },
-        transaction
+          aplicado_por_usuario_id: aplicadoPor
+        }
       );
 
-      await actualizarRentaBaseInmueble(
-        empresa_id,
+      await actualizarRentaInmuebleCatalog(
         inmueble_id,
-        nuevaRenta,
-        transaction
+        nuevaRenta
       );
-
-      if (aplicar_a_publicacion) {
-        await actualizarPrecioPublicacion(
-          inmueble_id,
-          nuevaRenta,
-          transaction
-        );
-      }
 
       actualizados.push({
         inmueble_id,
+        codigo: inmueble.codigo,
         nombre: inmueble.nombre,
         renta_anterior: rentaActual,
-        porcentaje_ipc_aplicado: porcentajeIPC,
+        porcentaje_ipc: porcentajeIPC,
         monto_incremento: montoIncremento,
         nueva_renta: nuevaRenta,
         tarifa
       });
     }
 
-    await transaction.commit();
+    await client.query('COMMIT');
 
-    return actualizados;
+    return {
+      total_actualizados: actualizados.length,
+      actualizados
+    };
 
   } catch (error) {
-    await transaction.rollback();
+    await client.query('ROLLBACK');
     throw error;
+  } finally {
+    client.release();
   }
 };
 
 const listarHistorialTarifas = async (empresa_id, inmueble_id) => {
-  const pool = await getConnection();
+  const inmueble = await obtenerInmueblePorId(
+    empresa_id,
+    inmueble_id
+  );
 
-  const result = await pool.request()
-    .input('empresa_id', sql.Int, empresa_id)
-    .input('inmueble_id', sql.Int, inmueble_id)
-    .query(`
-      SELECT
-        t.tarifa_inmueble_id,
-        t.inmueble_id,
-        t.indice_ipc_id,
-        ipc.anio,
-        t.vigencia_desde,
-        t.vigencia_hasta,
-        t.renta_base_mensual,
-        t.porcentaje_ipc_aplicado,
-        t.monto_incremento,
-        t.motivo,
-        t.aplicado_por_usuario_id,
-        pu.nombres AS aplicado_por_nombres,
-        pu.apellidos AS aplicado_por_apellidos,
-        t.created_at
-      FROM finance.TarifaInmueble t
-      INNER JOIN catalog.Inmueble i
-        ON i.inmueble_id = t.inmueble_id
-      LEFT JOIN finance.IndiceIPC ipc
-        ON ipc.indice_ipc_id = t.indice_ipc_id
-      LEFT JOIN core.PerfilUsuario pu
-        ON pu.usuario_id = t.aplicado_por_usuario_id
-      WHERE t.inmueble_id = @inmueble_id
-        AND i.empresa_id = @empresa_id
-      ORDER BY t.vigencia_desde DESC, t.tarifa_inmueble_id DESC
-    `);
+  if (!inmueble) return [];
 
-  return result.recordset;
+  const pool = getPostgresPool();
+
+  const result = await pool.query(
+    `
+    SELECT
+      tarifa_inmueble_id,
+      inmueble_id,
+      vigencia_desde,
+      vigencia_hasta,
+      renta_base_mensual,
+      porcentaje_ipc_aplicado,
+      monto_incremento,
+      motivo,
+      aplicado_por_usuario_id,
+      created_at
+    FROM tarifa_inmueble
+    WHERE inmueble_id = $1
+    ORDER BY vigencia_desde DESC, tarifa_inmueble_id DESC;
+    `,
+    [inmueble_id]
+  );
+
+  return result.rows.map(mapTarifa);
 };
 
 module.exports = {
