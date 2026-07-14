@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: booking-mysql-pvc
+  namespace: staype
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-mysql
+  namespace: staype
+spec:
+  selector:
+    app: booking-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-mysql
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: booking-mysql
+  template:
+    metadata:
+      labels:
+        app: booking-mysql
+    spec:
+      containers:
+        - name: booking-mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root"
+            - name: MYSQL_DATABASE
+              value: "staype_booking_db"
+            - name: MYSQL_USER
+              value: "booking_user"
+            - name: MYSQL_PASSWORD
+              value: "booking_pass"
+          volumeMounts:
+            - name: booking-mysql-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: booking-mysql-storage
+          persistentVolumeClaim:
+            claimName: booking-mysql-pvc

@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: finance-postgres-pvc
+  namespace: staype
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-postgres
+  namespace: staype
+spec:
+  selector:
+    app: finance-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-postgres
+  namespace: staype
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-postgres
+  template:
+    metadata:
+      labels:
+        app: finance-postgres
+    spec:
+      containers:
+        - name: finance-postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "staype_finance_db"
+            - name: POSTGRES_USER
+              value: "finance_user"
+            - name: POSTGRES_PASSWORD
+              value: "finance_pass"
+          volumeMounts:
+            - name: finance-postgres-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: finance-postgres-storage
+          persistentVolumeClaim:
+            claimName: finance-postgres-pvc
