@@ -270,7 +270,9 @@ PATCH http://localhost:8080/api/reservas/gestion/solicitudes/:reserva_id/checkou
 
 ### finance-service
 
-Microservicio encargado de la parte financiera del sistema.
+Microservicio encargado del dominio financiero del sistema. A diferencia de la
+primera etapa de la migración, este servicio ya utiliza una base de datos
+PostgreSQL independiente llamada `staype_finance_db`.
 
 Maneja rutas como:
 
@@ -300,6 +302,20 @@ Reportes financieros
 Reportes de pagos y deudores
 Dashboard de KPIs
 ```
+
+El servicio almacena localmente bancos, cuentas, categorías, movimientos,
+conceptos de cobro, recibos, pagos, índices IPC y el historial de tarifas.
+Cuando necesita información que pertenece a otro dominio, la consulta mediante
+clientes HTTP internos:
+
+```txt
+auth-service      → empresas administradas por el secretario
+booking-service   → información de la reserva
+catalog-service   → inmueble, publicación, renta actual y actualización de renta
+```
+
+Estas comunicaciones internas usan el header `x-gateway-secret` y tienen un
+timeout de 10 segundos.
 
 Puerto interno:
 
@@ -379,53 +395,59 @@ Si una petición intenta entrar directamente a un microservicio sin pasar por el
 
 ## Base de Datos
 
-En esta fase, los microservicios siguen utilizando la base de datos principal en SQL Server / Azure SQL Database.
-
-Esto permite migrar el sistema progresivamente sin perder datos ni romper la lógica existente.
-
-La separación final propuesta sería:
+La migración de datos se realiza progresivamente por dominio. El estado actual
+es el siguiente:
 
 ```txt
-auth-service      → Base de datos de autenticación
-catalog-service   → Base de datos de catálogo
-booking-service   → Base de datos de reservas
-finance-service   → Base de datos financiera
+auth-service      → SQL Server / Azure SQL Database
+catalog-service   → SQL Server / Azure SQL Database
+booking-service   → MySQL 8, base staype_booking_db
+finance-service   → PostgreSQL 16, base staype_finance_db
 ```
 
-Actualmente, los servicios se conectan a la misma base principal para mantener compatibilidad con los datos ya existentes.
+`finance-service` no realiza consultas directas a las tablas de Auth, Catalog o
+Booking. Para obtener esos datos consume los endpoints internos de cada
+microservicio.
+
+Las tablas financieras principales son:
+
+```txt
+banco
+categoria_movimiento
+concepto_cobro
+cuenta_bancaria
+cuenta_cobro_inmueble
+configuracion_cobro_inmueble
+indice_ipc
+tarifa_inmueble
+recibo
+recibo_detalle
+pago
+movimiento_bancario
+```
+
+El esquema PostgreSQL se encuentra en:
+
+```txt
+finance-service/scripts/finance_schema_postgres.sql
+```
+
+Los modelos de pagos, recibos, ingresos y mantenimiento utilizan transacciones
+`BEGIN`, `COMMIT` y `ROLLBACK` para mantener consistentes los saldos y los
+movimientos dentro de PostgreSQL.
 
 ---
 
 ## Variables de Entorno
 
-Cada microservicio tiene su propio archivo `.env`.
+Cada microservicio recibe su configuración mediante un archivo `.env` local o
+mediante Secrets del entorno de despliegue. El README no incluye el contenido,
+las claves ni los valores de esos archivos.
 
-Ejemplo general:
-
-```env
-PORT=8081
-SERVICE_NAME=auth-service
-REGISTRY_SERVER_URL=http://registry-service:8761
-GATEWAY_SECRET=staype-secret
-
-DB_USER=usuario_sql
-DB_PASSWORD=password_sql
-DB_SERVER=servidor.database.windows.net
-DB_DATABASE=nombre_base_datos
-DB_PORT=1433
-DB_ENCRYPT=true
-DB_TRUST_SERVER_CERTIFICATE=false
-
-JWT_SECRET=clave_jwt
-```
-
-Es importante que todos los microservicios que validan tokens usen el mismo:
-
-```env
-JWT_SECRET
-```
-
-Los archivos `.env` no deben subirse al repositorio porque contienen credenciales sensibles.
+Los archivos `.env` contienen información sensible, no deben subirse al
+repositorio y deben distribuirse mediante un canal seguro. Los servicios que
+comparten mecanismos de autenticación interna deben recibir valores compatibles
+desde el entorno, sin escribirlos directamente en la documentación o el código.
 
 ---
 
@@ -445,6 +467,17 @@ Estos archivos son necesarios tanto para Docker Compose como para Kubernetes.
 ---
 
 # Ejecución con Docker Compose
+
+Docker Compose levanta dos bases de datos independientes:
+
+```txt
+booking-mysql      → host localhost:3307, contenedor 3306
+finance-postgres   → host localhost:5433, contenedor 5432
+```
+
+Los microservicios usan los nombres internos `booking-mysql` y
+`finance-postgres`; no deben usar `localhost` para comunicarse entre
+contenedores.
 
 ## Construir y levantar todos los servicios
 
@@ -503,6 +536,23 @@ Respuesta esperada:
 }
 ```
 
+## Inicializar PostgreSQL financiero
+
+El contenedor `finance-postgres` persiste los datos en el volumen
+`finance_postgres_data`. El archivo Compose actual no ejecuta automáticamente
+el esquema SQL, por lo que una base nueva debe inicializarse antes de probar las
+rutas financieras.
+
+El esquema requerido está en:
+
+```txt
+finance-service/scripts/finance_schema_postgres.sql
+```
+
+No se debe eliminar un volumen que contenga información necesaria. El comando
+`docker compose down` conserva los datos, mientras que
+`docker compose down -v` también elimina los volúmenes.
+
 ---
 
 ## Orden Conceptual de Arranque
@@ -512,11 +562,12 @@ Aunque Docker Compose automatiza el proceso, el orden lógico es:
 ```txt
 1. config-service
 2. registry-service
-3. auth-service
-4. catalog-service
-5. booking-service
-6. finance-service
-7. api-gateway
+3. booking-mysql y finance-postgres
+4. auth-service
+5. catalog-service
+6. booking-service
+7. finance-service
+8. api-gateway
 ```
 
 El `config-service` debe estar disponible primero porque el Gateway obtiene de ahí sus rutas.
@@ -548,7 +599,9 @@ k8s
 ├── auth-service.yaml
 ├── catalog-service.yaml
 ├── booking-service.yaml
-└── finance-service.yaml
+├── booking-mysql.yaml
+├── finance-service.yaml
+└── finance-postgres.yaml
 ```
 
 ---
@@ -651,9 +704,13 @@ kubectl create configmap config-repo `
 
 ## Crear Secrets desde los `.env`
 
-Los archivos YAML no contienen credenciales directamente.
+Las variables sensibles de los microservicios se cargan mediante Secrets
+creados desde los archivos `.env`.
 
-Las variables sensibles se cargan mediante Secrets creados desde los archivos `.env`.
+Actualmente los manifiestos locales todavía incluyen valores de desarrollo
+para PostgreSQL y `GATEWAY_SECRET`. Estos valores sirven para la demostración
+local, pero en un despliegue compartido o productivo también deben trasladarse
+a Secrets y no deben mantenerse escritos directamente en los YAML.
 
 ```bash
 kubectl create secret generic auth-env `
@@ -685,6 +742,12 @@ kubectl create secret generic finance-env `
 kubectl apply -f .\k8s\
 ```
 
+El manifiesto `finance-postgres.yaml` crea un PVC de 1 GiB para conservar los
+datos. Al igual que en Docker Compose, los manifiestos actuales no ejecutan
+automáticamente `finance_schema_postgres.sql`; una instalación nueva necesita
+aplicar el esquema o incorporar un mecanismo de migraciones antes de usar
+Finance.
+
 ---
 
 ## Verificar Pods
@@ -702,6 +765,7 @@ booking-service    1/1 Running
 catalog-service    1/1 Running
 config-service     1/1 Running
 finance-service    1/1 Running
+finance-postgres   1/1 Running
 registry-service   1/1 Running
 ```
 
@@ -911,19 +975,11 @@ Para volver a desplegar, repetir:
 
 # Integración con Frontend
 
-El frontend debe apuntar al API Gateway.
-
-Para Docker Compose:
-
-```env
-VITE_API_URL=http://localhost:8080/api
-```
-
-Para Kubernetes usando port-forward:
-
-```env
-VITE_API_URL=http://localhost:18080/api
-```
+El frontend debe apuntar al API Gateway. En Docker Compose el Gateway se
+encuentra en `http://localhost:8080/api`; con el `port-forward` documentado para
+Kubernetes se encuentra en `http://localhost:18080/api`. La forma de inyectar
+esa configuración en el frontend debe mantenerse fuera del repositorio y de
+este README.
 
 De esta forma, el frontend no necesita saber qué microservicio atiende cada ruta.
 
@@ -1003,7 +1059,7 @@ booking-service
    ↓
 Validación JWT
    ↓
-SQL Server
+MySQL 8 / staype_booking_db
 ```
 
 ---
@@ -1025,8 +1081,12 @@ finance-service
    ↓
 Validación JWT
    ↓
-SQL Server
+PostgreSQL 16 / staype_finance_db
 ```
+
+Para completar recibos y pagos, `finance-service` puede consultar por HTTP la
+reserva en `booking-service` y el inmueble o publicación en `catalog-service`.
+Los saldos, recibos, pagos y movimientos permanecen en PostgreSQL financiero.
 
 ---
 
@@ -1150,7 +1210,9 @@ API Gateway
 │ Notificaciones        │ Disponibilidad        │ Extensiones           │ Reportes              │
 └──────────────────────┴──────────────────────┴──────────────────────┴──────────────────────┘
    ↓
-SQL Server / Azure SQL Database
+auth/catalog → SQL Server o Azure SQL
+booking      → MySQL 8
+finance      → PostgreSQL 16
 ```
 
 ---
@@ -1163,7 +1225,7 @@ Con esta arquitectura, el sistema queda dividido por responsabilidades:
 auth-service      → identidad, usuarios y notificaciones
 catalog-service   → catálogo de inmuebles, publicaciones y disponibilidad
 booking-service   → reservas, vetting, check-in, check-out y extensiones
-finance-service   → conceptos de cobro, recibos, pagos, tarifas y reportes
+finance-service   → conceptos, recibos, pagos, movimientos, tarifas y reportes en PostgreSQL
 ```
 
 El `api-gateway` centraliza el acceso, el `registry-service` mantiene el registro de servicios activos y el `config-service` centraliza la configuración de rutas.
