@@ -1,5 +1,14 @@
+$dockerignore = @"
 node_modules
 npm-debug.log
 .env
 .git
-.gitignore
+dist
+build
+coverage
+"@
+
+"config-service","registry-service","api-gateway","auth-service","catalog-service","booking-service","finance-service" |
+ForEach-Object {
+    Set-Content -Path ".\$_\.dockerignore" -Value $dockerignore -Encoding UTF8
+}

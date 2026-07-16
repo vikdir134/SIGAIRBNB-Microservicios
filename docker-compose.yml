@@ -1,6 +1,5 @@
 services:
   # Config Service
-  # Equivalente al Config Server de Spring Cloud.
   config-service:
     build: ./config-service
     container_name: staype-config-service
@@ -17,7 +16,6 @@ services:
       retries: 5
 
   # Registry Service
-  # Equivalente conceptual a Eureka Server.
   registry-service:
     build: ./registry-service
     container_name: staype-registry-service
@@ -34,36 +32,67 @@ services:
       timeout: 5s
       retries: 5
 
+  # SQL Server local para catalog-service
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: staype-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Staype123!
+      - MSSQL_PID=Developer
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  # Inicializador de la BD catalog en SQL Server
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: staype-sqlserver-init
+    environment:
+      - SA_PASSWORD=Staype123!
+    volumes:
+      - ./database/sqlserver:/init:ro
+    command: >
+      bash /init/init/init-catalog.sh
+    depends_on:
+      sqlserver:
+        condition: service_started
+    restart: "no"
+
   # MySQL para booking-service
   booking-mysql:
     image: mysql:8.0
     container_name: staype-booking-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: staype_booking_db
-      MYSQL_USER: booking_user
-      MYSQL_PASSWORD: booking_pass
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=staype_booking_db
+      - MYSQL_USER=booking_user
+      - MYSQL_PASSWORD=booking_pass
     ports:
       - "3307:3306"
     volumes:
       - booking_mysql_data:/var/lib/mysql
+      - ./database/mysql/booking:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  # PostgreSQL para finance-service
   finance-postgres:
     image: postgres:16
     container_name: staype-finance-postgres
     environment:
-      POSTGRES_DB: staype_finance_db
-      POSTGRES_USER: finance_user
-      POSTGRES_PASSWORD: finance_pass
+      - POSTGRES_DB=staype_finance_db
+      - POSTGRES_USER=finance_user
+      - POSTGRES_PASSWORD=finance_pass
     ports:
       - "5433:5432"
     volumes:
       - finance_postgres_data:/var/lib/postgresql/data
+      - ./database/postgres/finance:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U finance_user -d staype_finance_db"]
       interval: 10s
@@ -71,26 +100,72 @@ services:
       retries: 10
 
   # Catalog Service
-  # Maneja edificios, inmuebles, publicaciones y disponibilidad.
   catalog-service:
     build: ./catalog-service
     container_name: staype-catalog-service
     expose:
       - "8082"
-    env_file:
-      - ./catalog-service/.env
+    environment:
+      - PORT=8082
+      - SERVICE_NAME=catalog-service
+      - REGISTRY_SERVER_URL=http://registry-service:8761
+      - GATEWAY_SECRET=staype-secret
+
+      - DB_USER=sa
+      - DB_PASSWORD=Staype123!
+      - DB_SERVER=sqlserver
+      - DB_DATABASE=staype_catalog_db
+      - DB_PORT=1433
+      - DB_ENCRYPT=false
+      - DB_TRUST_SERVER_CERTIFICATE=true
+
+      - JWT_SECRET=clave_secreta_temporal_sprint1
+
+      - CLOUDINARY_CLOUD_NAME=dnir1wgg2
+      - CLOUDINARY_API_KEY=871346184735396
+      - CLOUDINARY_API_SECRET=MMzLLaN3tzQP7ggP9vK8QrjbUD4
+      - CLOUDINARY_FOLDER=sigairbnb/inmuebles
+
+      - BUSINESS_MIN_YEAR=2024
+      - MAX_FUTURE_YEARS=1
+
+      - BOOKING_SERVICE_URL=http://booking-service:8083
+      - AUTH_SERVICE_URL=http://auth-service:8081
     depends_on:
       registry-service:
         condition: service_healthy
+      sqlserver-init:
+        condition: service_completed_successfully
 
-  # Auth Service
+  # Auth Service conectado a BD en la nube
   auth-service:
     build: ./auth-service
     container_name: staype-auth-service
     expose:
       - "8081"
-    env_file:
-      - ./auth-service/.env
+    environment:
+      - PORT=8081
+      - SERVICE_NAME=auth-service
+      - REGISTRY_SERVER_URL=http://registry-service:8761
+      - GATEWAY_SECRET=staype-secret
+
+      - DB_USER=admin3360160@
+      - DB_PASSWORD=3360160@Am
+      - DB_SERVER=sigaairdnb5.database.windows.net
+      - DB_DATABASE=free-sql-db-9588058
+      - DB_PORT=1433
+      - DB_ENCRYPT=true
+      - DB_TRUST_SERVER_CERTIFICATE=false
+
+      - JWT_SECRET=clave_secreta_temporal_sprint1
+
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=587
+      - EMAIL_USER=wgfdwgfdgrge@gmail.com
+      - EMAIL_PASSWORD=qegkwtymejmsazck
+      - EMAIL_FROM=Stay.pe <wgfdwgfdgrge@gmail.com>
+
+      - FRONTEND_URL=http://localhost:5173
     depends_on:
       registry-service:
         condition: service_healthy
@@ -101,8 +176,24 @@ services:
     container_name: staype-booking-service
     expose:
       - "8083"
-    env_file:
-      - ./booking-service/.env
+    environment:
+      - PORT=8083
+      - SERVICE_NAME=booking-service
+      - REGISTRY_SERVER_URL=http://registry-service:8761
+      - GATEWAY_SECRET=staype-secret
+
+      - JWT_SECRET=clave_secreta_temporal_sprint1
+      - MAX_RESERVA_DAYS=365
+      - MAX_RESERVA_FUTURE_YEARS=1
+
+      - BOOKING_MYSQL_HOST=booking-mysql
+      - BOOKING_MYSQL_PORT=3306
+      - BOOKING_MYSQL_USER=booking_user
+      - BOOKING_MYSQL_PASSWORD=booking_pass
+      - BOOKING_MYSQL_DATABASE=staype_booking_db
+
+      - CATALOG_SERVICE_URL=http://catalog-service:8082
+      - AUTH_SERVICE_URL=http://auth-service:8081
     depends_on:
       registry-service:
         condition: service_healthy
@@ -115,16 +206,37 @@ services:
     container_name: staype-finance-service
     expose:
       - "8084"
-    env_file:
-      - ./finance-service/.env
+    environment:
+      - PORT=8084
+      - SERVICE_NAME=finance-service
+
+      - REGISTRY_SERVER_URL=http://registry-service:8761
+      - GATEWAY_SECRET=staype-secret
+      - JWT_SECRET=clave_secreta_temporal_sprint1
+
+      - BUSINESS_MIN_YEAR=2024
+      - MAX_FUTURE_YEARS=1
+
+      - FINANCE_PG_HOST=finance-postgres
+      - FINANCE_PG_PORT=5432
+      - FINANCE_PG_USER=finance_user
+      - FINANCE_PG_PASSWORD=finance_pass
+      - FINANCE_PG_DATABASE=staype_finance_db
+
+      - BOOKING_SERVICE_URL=http://booking-service:8083
+      - CATALOG_SERVICE_URL=http://catalog-service:8082
+      - AUTH_SERVICE_URL=http://auth-service:8081
     depends_on:
       registry-service:
         condition: service_healthy
       finance-postgres:
         condition: service_healthy
+      booking-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
 
   # API Gateway
-  # Unica entrada publica hacia los microservicios.
   api-gateway:
     build: ./api-gateway
     container_name: staype-api-gateway
@@ -150,5 +262,6 @@ services:
         condition: service_started
 
 volumes:
+  sqlserver_data:
   booking_mysql_data:
   finance_postgres_data:
