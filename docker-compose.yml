@@ -156,7 +156,8 @@ services:
       - DB_PORT=1433
       - DB_ENCRYPT=true
       - DB_TRUST_SERVER_CERTIFICATE=false
-
+      - DB_WAIT_RETRIES=60
+      - DB_WAIT_DELAY_MS=5000
       - JWT_SECRET=clave_secreta_temporal_sprint1
 
       - EMAIL_HOST=smtp.gmail.com
@@ -260,7 +261,21 @@ services:
         condition: service_started
       finance-service:
         condition: service_started
-
+  # Frontend React + Nginx
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+        VITE_DEMO_EMAIL: jorge.chavezg@unmsm.edu.pe
+        VITE_DEMO_PASSWORD: J0rge1201
+    container_name: staype-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      api-gateway:
+        condition: service_started
+        
 volumes:
   sqlserver_data:
   booking_mysql_data:

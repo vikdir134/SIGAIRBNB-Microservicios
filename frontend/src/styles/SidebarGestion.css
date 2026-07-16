@@ -1,0 +1,349 @@
+:root {
+    --sidebar-expanded-width: 270px;
+    --sidebar-collapsed-width: 88px;
+    --sidebar-current-width: 270px;
+}
+
+/* Sidebar fijo */
+.gestion-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+
+    width: var(--sidebar-current-width);
+    height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    padding: 24px 16px;
+    box-sizing: border-box;
+
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    box-shadow: 4px 0 16px rgba(15, 23, 42, 0.06);
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    transition: width 0.25s ease;
+}
+
+/* Botón para contraer */
+.sidebar-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+
+    width: 38px;
+    height: 38px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+
+    background: linear-gradient(135deg, #7f0000, #b91c1c);
+    color: #ffffff;
+
+    font-size: 1.6rem;
+    font-weight: 900;
+    line-height: 1;
+
+    cursor: pointer;
+    z-index: 1200;
+
+    box-shadow: 0 8px 20px rgba(127, 0, 0, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+    transform: scale(1.08);
+    box-shadow: 0 10px 24px rgba(127, 0, 0, 0.45);
+    background: linear-gradient(135deg, #991b1b, #dc2626);
+}
+
+.sidebar-toggle:active {
+    transform: scale(0.96);
+}
+
+.sidebar-toggle:hover {
+    background: #fef2f2;
+}
+
+/* Parte superior */
+.gestion-sidebar-top {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Título */
+.sidebar-title {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #9ca3af;
+}
+
+/* Usuario */
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 14px;
+    border-radius: 16px;
+
+    background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+    border: 1px solid #e5e7eb;
+}
+
+.sidebar-avatar {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: #7f0000;
+    color: #ffffff;
+
+    font-weight: 800;
+    font-size: 0.95rem;
+}
+
+.sidebar-user-info {
+    min-width: 0;
+    transition: opacity 0.2s ease;
+}
+
+.sidebar-user-name {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+    display: block;
+    margin-top: 2px;
+
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+/* Menú */
+.sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-menu a,
+.sidebar-logout {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    min-height: 42px;
+    padding: 10px 12px;
+
+    border-radius: 12px;
+
+    color: #374151;
+    text-decoration: none;
+
+    font-size: 0.92rem;
+    font-weight: 600;
+
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.sidebar-menu a:hover {
+    background: #f3f4f6;
+    color: #7f0000;
+    transform: translateX(3px);
+}
+
+.sidebar-menu a.active {
+    background: linear-gradient(135deg, #7f0000, #b91c1c);
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(127, 0, 0, 0.22);
+}
+
+.sidebar-link-icon {
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 8px;
+
+    font-size: 0.78rem;
+    font-weight: 900;
+
+    background: #f3f4f6;
+    color: #7f0000;
+}
+
+.sidebar-menu a.active .sidebar-link-icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+}
+
+.sidebar-link-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Botón cerrar sesión */
+.sidebar-logout {
+    width: 100%;
+    margin-top: 20px;
+
+    border: none;
+
+    background: #fee2e2;
+    color: #991b1b;
+
+    cursor: pointer;
+}
+
+.sidebar-logout:hover {
+    background: #fecaca;
+    transform: translateY(-1px);
+}
+
+/* Estado contraído */
+.gestion-sidebar.sidebar-collapsed .sidebar-title {
+    visibility: hidden;
+    opacity: 0;
+}
+
+.gestion-sidebar.sidebar-collapsed .sidebar-user {
+    justify-content: center;
+    padding: 14px;
+    min-height: 68px;
+}
+
+.gestion-sidebar.sidebar-collapsed .sidebar-user-info {
+    width: 0;
+    opacity: 0;
+    visibility: hidden;
+    overflow: hidden;
+}
+
+.gestion-sidebar.sidebar-collapsed .sidebar-link-text {
+    width: 0;
+    opacity: 0;
+    visibility: hidden;
+    overflow: hidden;
+}
+
+.gestion-sidebar.sidebar-collapsed .sidebar-menu a,
+.gestion-sidebar.sidebar-collapsed .sidebar-logout {
+    justify-content: center;
+    padding: 10px 12px;
+}
+
+.gestion-sidebar.sidebar-collapsed .sidebar-link-icon {
+    margin: 0;
+}
+
+/* Scroll interno */
+.gestion-sidebar::-webkit-scrollbar {
+    width: 7px;
+}
+
+.gestion-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.gestion-sidebar::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 999px;
+}
+
+.gestion-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* 
+   CLASE CLAVE:
+   Esta evita que el sidebar se sobreponga a la página.
+*/
+.gestion-main-content {
+    margin-left: var(--sidebar-current-width);
+    width: calc(100% - var(--sidebar-current-width));
+    min-height: 100vh;
+    box-sizing: border-box;
+    transition:
+        margin-left 0.25s ease,
+        width 0.25s ease;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .gestion-sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        min-height: auto;
+
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .sidebar-toggle {
+        display: none;
+    }
+
+    .gestion-main-content {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .sidebar-menu {
+        max-height: 340px;
+        overflow-y: auto;
+    }
+}
+body.gestion-con-sidebar #root {
+    padding-left: var(--sidebar-current-width);
+    box-sizing: border-box;
+    transition: padding-left 0.25s ease;
+}
+
+/* El sidebar queda fijo encima, pero el contenido ya deja espacio */
+body.gestion-con-sidebar .gestion-sidebar {
+    left: 0;
+}
+
+/* En pantallas pequeñas no empujamos el contenido */
+@media (max-width: 900px) {
+    body.gestion-con-sidebar #root {
+        padding-left: 0;
+    }
+}

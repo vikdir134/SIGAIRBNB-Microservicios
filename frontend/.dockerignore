@@ -1,0 +1,10 @@
+@"
+node_modules
+dist
+build
+.env
+.env.local
+.git
+coverage
+npm-debug.log
+"@ | Set-Content .\frontend\.dockerignore -Encoding UTF8

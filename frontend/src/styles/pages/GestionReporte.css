@@ -1,0 +1,615 @@
+.gestion-reportes-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+.gestion-reportes-main {
+  flex: 1;
+  padding: 28px;
+  overflow-x: hidden;
+}
+
+.gestion-reportes-header {
+  margin-bottom: 24px;
+}
+
+.gestion-reportes-header h1 {
+  margin: 0;
+  font-size: 28px;
+  color: #1f2937;
+}
+
+.gestion-reportes-header p {
+  margin: 8px 0 0;
+  color: #6b7280;
+}
+
+.gestion-reportes-subtitle {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reportes-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  margin-bottom: 22px;
+}
+
+.filtros-header h2,
+.tabla-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #111827;
+}
+
+.filtros-header p,
+.tabla-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+}
+
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 18px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-group input,
+.form-group select {
+  height: 42px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #111827;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.filtros-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.btn-consultar {
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  padding: 0 18px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.btn-consultar:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-consultar:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.validacion-filtros {
+  margin: 14px 0 0;
+  color: #92400e;
+  font-size: 14px;
+}
+
+.mensaje-error {
+  margin: 14px 0 0;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.resumen-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.resumen-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border-left: 6px solid #9ca3af;
+}
+
+.resumen-card p {
+  margin: 0;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.resumen-card h3 {
+  margin: 10px 0 0;
+  font-size: 26px;
+  color: #111827;
+}
+
+.ingresos-card {
+  border-left-color: #16a34a;
+}
+
+.gastos-card {
+  border-left-color: #dc2626;
+}
+
+.balance-positivo {
+  border-left-color: #16a34a;
+}
+
+.balance-negativo {
+  border-left-color: #dc2626;
+}
+
+.balance-neutro {
+  border-left-color: #6b7280;
+}
+
+.balance-positivo h3 {
+  color: #15803d;
+}
+
+.balance-negativo h3 {
+  color: #b91c1c;
+}
+
+.balance-neutro h3 {
+  color: #374151;
+}
+
+.estado-card h3 {
+  margin: 0 0 8px;
+  color: #111827;
+}
+
+.estado-card p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.tabla-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tabla-header {
+  padding: 22px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tabla-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tabla-movimientos {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+}
+
+.tabla-movimientos th {
+  text-align: left;
+  padding: 14px 16px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tabla-movimientos td {
+  padding: 14px 16px;
+  border-top: 1px solid #e5e7eb;
+  color: #374151;
+  vertical-align: top;
+}
+
+.tabla-movimientos td strong {
+  display: block;
+  color: #111827;
+}
+
+.tabla-movimientos td small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.descripcion-movimiento {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.badge-movimiento {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge-ingreso {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-gasto {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tabla-vacia {
+  padding: 28px;
+  color: #6b7280;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .gestion-reportes-layout {
+    flex-direction: column;
+  }
+
+  .gestion-reportes-main {
+    padding: 18px;
+  }
+
+  .filtros-grid,
+  .resumen-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .btn-consultar {
+    width: 100%;
+  }
+}
+
+.dashboard-kpis-card {
+  margin-top: 1.5rem;
+}
+
+.dashboard-kpis-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-kpis-header h2 {
+  margin: 0;
+}
+
+.dashboard-kpis-header p {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+}
+
+.btn-refresh-dashboard {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.btn-refresh-dashboard:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-refresh-dashboard:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  flex-shrink: 0;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dashboard-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: #64748b;
+}
+
+.dashboard-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.dashboard-status.SALUDABLE {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dashboard-status.ATENCION {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dashboard-status.CRITICO {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dashboard-status.NEUTRO {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.dashboard-alertas {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-alertas p {
+  margin: 0;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.kpi-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.kpi-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.kpi-card h3 {
+  margin: 0.5rem 0;
+  color: #0f172a;
+  font-size: 1.5rem;
+}
+
+.kpi-card span {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 1024px) {
+  .kpis-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-kpis-header,
+  .dashboard-status-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .kpis-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-graficos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.dashboard-chart-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.chart-card-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-header {
+  margin-bottom: 1rem;
+}
+
+.chart-header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.1rem;
+}
+
+.chart-header p {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.chart-container {
+  width: 100%;
+  min-height: 300px;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-graficos-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-container-pie {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recharts-wrapper {
+  font-family: inherit;
+}
+
+.recharts-default-tooltip {
+  border-radius: 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08) !important;
+}
+
+.dashboard-chart-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.08);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.dashboard-tabla-inmuebles {
+  margin-top: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.dashboard-tabla-inmuebles .tabla-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dashboard-tabla-inmuebles .tabla-header h2 {
+  margin: 0;
+}
+
+.dashboard-tabla-inmuebles .tabla-header p {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+}
+
+.tabla-kpis-inmuebles td,
+.tabla-kpis-inmuebles th {
+  white-space: nowrap;
+}
+
+.utilidad-positiva {
+  color: #166534;
+  font-weight: 700;
+}
+
+.utilidad-negativa {
+  color: #991b1b;
+  font-weight: 700;
+}
+
+.badge-estado-inmueble {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.estado-alto {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.estado-rentable {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.estado-cobros {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.estado-baja {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.estado-neutro {
+  background: #e2e8f0;
+  color: #334155;
+}
