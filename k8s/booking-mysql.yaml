@@ -55,7 +55,12 @@ spec:
           volumeMounts:
             - name: booking-mysql-storage
               mountPath: /var/lib/mysql
+            - name: booking-mysql-initdb
+              mountPath: /docker-entrypoint-initdb.d
       volumes:
         - name: booking-mysql-storage
           persistentVolumeClaim:
             claimName: booking-mysql-pvc
+        - name: booking-mysql-initdb
+          configMap:
+            name: booking-mysql-initdb

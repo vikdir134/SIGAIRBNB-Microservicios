@@ -53,7 +53,12 @@ spec:
           volumeMounts:
             - name: finance-postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: finance-postgres-initdb
+              mountPath: /docker-entrypoint-initdb.d
       volumes:
         - name: finance-postgres-storage
           persistentVolumeClaim:
             claimName: finance-postgres-pvc
+        - name: finance-postgres-initdb
+          configMap:
+            name: finance-postgres-initdb

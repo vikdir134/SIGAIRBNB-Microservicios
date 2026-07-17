@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sqlserver-init
+  namespace: staype
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app: sqlserver-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: sqlserver-init
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          env:
+            - name: SA_PASSWORD
+              value: "Staype123!"
+          command:
+            - bash
+            - /init/init/init-catalog.sh
+          volumeMounts:
+            - name: catalog-sql
+              mountPath: /init/catalog
+            - name: catalog-init-script
+              mountPath: /init/init
+      volumes:
+        - name: catalog-sql
+          configMap:
+            name: catalog-sql-initdb
+        - name: catalog-init-script
+          configMap:
+            name: catalog-init-script

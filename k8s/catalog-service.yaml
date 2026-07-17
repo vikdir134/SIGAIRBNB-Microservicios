@@ -22,6 +22,30 @@ spec:
           envFrom:
             - secretRef:
                 name: catalog-env
+                optional: true
+          env:
+            - name: PORT
+              value: "8082"
+            - name: SERVICE_NAME
+              value: "catalog-service"
+            - name: REGISTRY_SERVER_URL
+              value: "http://registry-service:8761"
+            - name: GATEWAY_SECRET
+              value: "staype-secret"
+            - name: DB_USER
+              value: "sa"
+            - name: DB_PASSWORD
+              value: "Staype123!"
+            - name: DB_SERVER
+              value: "sqlserver"
+            - name: DB_DATABASE
+              value: "staype_catalog_db"
+            - name: DB_PORT
+              value: "1433"
+            - name: DB_ENCRYPT
+              value: "false"
+            - name: DB_TRUST_SERVER_CERTIFICATE
+              value: "true"
 ---
 apiVersion: v1
 kind: Service
